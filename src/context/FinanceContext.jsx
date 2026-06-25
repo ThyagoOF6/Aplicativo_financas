@@ -33,6 +33,8 @@ export const FinanceProvider = ({ children }) => {
   const [documents, setDocuments] = useState([]);
   const [profile, setProfile] = useState('');
   const [investmentGoal, setInvestmentGoal] = useState({ target: 0, current: 0, label: 'Reserva de Emergência' });
+  const [budgets, setBudgets] = useState([]);
+  const [settings, setSettings] = useState({ autoLockMinutes: 5, theme: 'dark' });
 
   // Sync to raw storage (only when unlocked and key exists)
   useEffect(() => {
@@ -99,6 +101,22 @@ export const FinanceProvider = ({ children }) => {
     }
   }, [investmentGoal, isLocked, sessionKey]);
 
+  useEffect(() => {
+    if (!isLocked && sessionKey) {
+      encryptData(JSON.stringify(budgets), sessionKey).then(enc => {
+        setRawStorageItem('wealth_mgr_budgets', enc);
+      });
+    }
+  }, [budgets, isLocked, sessionKey]);
+
+  useEffect(() => {
+    if (!isLocked && sessionKey) {
+      encryptData(JSON.stringify(settings), sessionKey).then(enc => {
+        setRawStorageItem('wealth_mgr_settings', enc);
+      });
+    }
+  }, [settings, isLocked, sessionKey]);
+
   // Document migration from metadata to IndexedDB
   const migrateDocsFromMetadata = async (parsedDocs, cryptoKey) => {
     if (!Array.isArray(parsedDocs)) return parsedDocs;
@@ -135,7 +153,9 @@ export const FinanceProvider = ({ children }) => {
         investments,
         documents,
         profile,
-        investmentGoal
+        investmentGoal,
+        budgets,
+        settings
       };
       
       const ciphertext = await encryptData(JSON.stringify(dataToEncrypt), key);
@@ -168,7 +188,7 @@ export const FinanceProvider = ({ children }) => {
       }, 5000);
       return () => clearTimeout(timeout);
     }
-  }, [accounts, dependents, transactions, reminders, investments, documents, profile, investmentGoal, isLocked, sessionKey, jwtToken, syncWithCloud]);
+  }, [accounts, dependents, transactions, reminders, investments, documents, profile, investmentGoal, budgets, settings, isLocked, sessionKey, jwtToken, syncWithCloud]);
 
   // Decrypts and loads all local database states
   const decryptAndLoadState = async (cryptoKey) => {
@@ -183,7 +203,9 @@ export const FinanceProvider = ({ children }) => {
         setDocuments(cleaned);
       }, def: [] },
       { storageKey: 'wealth_mgr_profile', setter: setProfile, def: '' },
-      { storageKey: 'wealth_mgr_investment_goal', setter: setInvestmentGoal, def: { target: 0, current: 0, label: 'Reserva de Emergência' } }
+      { storageKey: 'wealth_mgr_investment_goal', setter: setInvestmentGoal, def: { target: 0, current: 0, label: 'Reserva de Emergência' } },
+      { storageKey: 'wealth_mgr_budgets', setter: setBudgets, def: [] },
+      { storageKey: 'wealth_mgr_settings', setter: setSettings, def: { autoLockMinutes: 5, theme: 'dark' } }
     ];
 
     for (const key of keys) {
@@ -231,6 +253,8 @@ export const FinanceProvider = ({ children }) => {
       setDocuments([]);
       setProfile('');
       setInvestmentGoal({ target: 0, current: 0, label: 'Reserva de Emergência' });
+      setBudgets([]);
+      setSettings({ autoLockMinutes: 5, theme: 'dark' });
       
       return true;
     } catch (error) {
@@ -292,6 +316,8 @@ export const FinanceProvider = ({ children }) => {
                 }
                 if (parsed.profile !== undefined) setProfile(parsed.profile);
                 if (parsed.investmentGoal) setInvestmentGoal(parsed.investmentGoal);
+                if (parsed.budgets) setBudgets(parsed.budgets);
+                if (parsed.settings) setSettings(parsed.settings);
               }
             }).catch(err => {
               console.warn("Could not auto-fetch vault:", err);
@@ -327,6 +353,8 @@ export const FinanceProvider = ({ children }) => {
     setInvestments([]);
     setDocuments([]);
     setProfile('');
+    setBudgets([]);
+    setSettings({ autoLockMinutes: 5, theme: 'dark' });
   }, []);
 
   const registerCloud = useCallback(async (user, password) => {
@@ -375,7 +403,7 @@ export const FinanceProvider = ({ children }) => {
       setSyncStatus('synced');
 
       const dataToSync = {
-        accounts, dependents, transactions, reminders, investments, documents, profile, investmentGoal
+        accounts, dependents, transactions, reminders, investments, documents, profile, investmentGoal, budgets, settings
       };
 
       await syncWithCloud(activeKey, token, dataToSync);
@@ -435,6 +463,8 @@ export const FinanceProvider = ({ children }) => {
           }
           if (parsed.profile !== undefined) setProfile(parsed.profile);
           if (parsed.investmentGoal) setInvestmentGoal(parsed.investmentGoal);
+          if (parsed.budgets) setBudgets(parsed.budgets);
+          if (parsed.settings) setSettings(parsed.settings);
 
           // Update backups
           setRawStorageItem('wealth_mgr_accounts', await encryptData(JSON.stringify(parsed.accounts || []), cryptoKey));
@@ -444,6 +474,8 @@ export const FinanceProvider = ({ children }) => {
           setRawStorageItem('wealth_mgr_investments', await encryptData(JSON.stringify(parsed.investments || []), cryptoKey));
           setRawStorageItem('wealth_mgr_profile', await encryptData(JSON.stringify(parsed.profile || ''), cryptoKey));
           setRawStorageItem('wealth_mgr_investment_goal', await encryptData(JSON.stringify(parsed.investmentGoal || {}), cryptoKey));
+          setRawStorageItem('wealth_mgr_budgets', await encryptData(JSON.stringify(parsed.budgets || []), cryptoKey));
+          setRawStorageItem('wealth_mgr_settings', await encryptData(JSON.stringify(parsed.settings || { autoLockMinutes: 5, theme: 'dark' }), cryptoKey));
         }
       }
 
@@ -609,6 +641,34 @@ export const FinanceProvider = ({ children }) => {
     setDocuments(prev => [...prev, { ...doc, id: crypto.randomUUID() }]);
   }, []);
 
+  const updateBudget = useCallback((category, limit) => {
+    setBudgets(prev => {
+      const exists = prev.some(b => b.category === category);
+      if (exists) {
+        return prev.map(b => b.category === category ? { ...b, limit: parseFloat(limit) } : b);
+      } else {
+        return [...prev, { category, limit: parseFloat(limit) }];
+      }
+    });
+  }, []);
+
+  const updateSettings = useCallback((newSettings) => {
+    setSettings(prev => ({ ...prev, ...newSettings }));
+  }, []);
+
+  const restoreFullBackup = useCallback((data) => {
+    if (data.accounts) setAccounts(data.accounts);
+    if (data.dependents) setDependents(data.dependents);
+    if (data.transactions) setTransactions(data.transactions);
+    if (data.reminders) setReminders(data.reminders);
+    if (data.investments) setInvestments(data.investments);
+    if (data.documents) setDocuments(data.documents);
+    if (data.profile !== undefined) setProfile(data.profile);
+    if (data.investmentGoal) setInvestmentGoal(data.investmentGoal);
+    if (data.budgets) setBudgets(data.budgets);
+    if (data.settings) setSettings(data.settings);
+  }, []);
+
   const deleteDocument = useCallback((id) => {
     setDocuments(prev => prev.filter(d => d.id !== id));
   }, []);
@@ -646,8 +706,13 @@ export const FinanceProvider = ({ children }) => {
       deleteInvestment,
       updateInvestment,
       updateInvestmentPrices,
+      budgets,
+      updateBudget,
+      settings,
+      updateSettings,
       addDocument,
       deleteDocument,
+      restoreFullBackup,
       // Sync parameters
       username,
       syncStatus,

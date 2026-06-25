@@ -15,16 +15,22 @@ const Reminders = lazy(() => import('./components/Reminders'));
 const Investments = lazy(() => import('./components/Investments'));
 const Reports = lazy(() => import('./components/Reports'));
 const DataHub = lazy(() => import('./components/DataHub'));
+const SettingsManager = lazy(() => import('./components/layout/SettingsManager'));
 
 function MainContent() {
-  const { isLocked, isInitialized, setupMasterPassword, unlockWallet, lockWallet } = useContext(FinanceContext);
+  const { isLocked, isInitialized, setupMasterPassword, unlockWallet, lockWallet, settings } = useContext(FinanceContext);
   const [activeTab, setActiveTab] = useState('dashboard');
+
+  useEffect(() => {
+    const theme = settings?.theme || 'dark';
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [settings?.theme]);
 
   useEffect(() => {
     if (isLocked) return;
 
     let timeoutId;
-    const INACTIVITY_TIME = 5 * 60 * 1000; // 5 minutes
+    const INACTIVITY_TIME = (settings?.autoLockMinutes || 5) * 60 * 1000;
 
     const resetTimer = () => {
       if (timeoutId) clearTimeout(timeoutId);
@@ -46,7 +52,7 @@ function MainContent() {
         window.removeEventListener(event, resetTimer);
       });
     };
-  }, [isLocked, lockWallet]);
+  }, [isLocked, lockWallet, settings?.autoLockMinutes]);
 
   const renderActiveTab = () => {
     switch (activeTab) {
@@ -68,6 +74,8 @@ function MainContent() {
         return <Reports />;
       case 'datahub':
         return <DataHub />;
+      case 'settings':
+        return <SettingsManager />;
       default:
         return <Dashboard setActiveTab={setActiveTab} />;
     }

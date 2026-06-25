@@ -21,7 +21,8 @@ const Dashboard = ({ setActiveTab }) => {
     transactions, 
     reminders,
     profile,
-    username
+    username,
+    budgets = []
   } = useContext(FinanceContext);
 
 
@@ -102,8 +103,37 @@ const Dashboard = ({ setActiveTab }) => {
         });
       }
     }
+    // Budget limit checks
+    if (Array.isArray(budgets) && budgets.length > 0) {
+      budgets.forEach(b => {
+        if (b.limit > 0) {
+          const catExpense = monthlyTransactions
+            .filter(t => t.type === 'expense' && t.category === b.category)
+            .reduce((sum, t) => sum + t.amount, 0);
+          
+          if (catExpense >= b.limit) {
+            alerts.push({
+              id: `budget-exceeded-${b.category}`,
+              type: 'warning',
+              icon: <AlertTriangle className="text-danger" size={18} />,
+              title: `Orçamento Estourado: ${b.category}`,
+              text: `Você gastou ${formatBRL(catExpense)} do limite de ${formatBRL(b.limit)} em ${b.category}.`
+            });
+          } else if (catExpense >= b.limit * 0.8) {
+            alerts.push({
+              id: `budget-warning-${b.category}`,
+              type: 'warning',
+              icon: <AlertTriangle className="text-warning" size={18} />,
+              title: `Limite Próximo: ${b.category}`,
+              text: `Você consumiu ${(catExpense / b.limit * 100).toFixed(0)}% (${formatBRL(catExpense)}) do orçamento de ${formatBRL(b.limit)} em ${b.category}.`
+            });
+          }
+        }
+      });
+    }
+
     return alerts;
-  }, [transactions, investments, profile]);
+  }, [transactions, investments, profile, budgets, monthlyTransactions]);
 
   return (
     <div className="dashboard-container flex-column gap-lg">
@@ -186,21 +216,47 @@ const Dashboard = ({ setActiveTab }) => {
           </div>
           <div className="category-list">
             {expenseCategories.length > 0 ? (
-              expenseCategories.map(cat => (
-                <div key={cat.name} className="category-item">
-                  <div className="category-item-info flex-between">
-                    <span className="category-name">{cat.name}</span>
-                    <span className="category-amount font-semibold">{formatBRL(cat.amount)}</span>
+              expenseCategories.map(cat => {
+                const catBudget = budgets?.find(b => b.category === cat.name);
+                const limit = catBudget ? catBudget.limit : 0;
+                const hasLimit = limit > 0;
+                const percentOfBudget = hasLimit ? (cat.amount / limit) * 100 : 0;
+                
+                let barColor = '';
+                if (hasLimit) {
+                  if (percentOfBudget >= 100) barColor = 'bg-danger';
+                  else if (percentOfBudget >= 80) barColor = 'bg-warning';
+                  else barColor = 'bg-success';
+                }
+
+                return (
+                  <div key={cat.name} className="category-item">
+                    <div className="category-item-info flex-between">
+                      <span className="category-name">
+                        {cat.name} 
+                        {hasLimit && (
+                          <span className="text-xxs text-secondary" style={{ marginLeft: 8 }}>
+                            (Meta: {formatBRL(limit)})
+                          </span>
+                        )}
+                      </span>
+                      <span className="category-amount font-semibold">{formatBRL(cat.amount)}</span>
+                    </div>
+                    <div className="progress-bar-container">
+                      <div 
+                        className={`progress-bar-fill ${barColor}`} 
+                        style={{ width: `${hasLimit ? Math.min(100, percentOfBudget) : cat.percent}%` }}
+                      ></div>
+                    </div>
+                    <span className="category-percent">
+                      {hasLimit 
+                        ? `${percentOfBudget.toFixed(0)}% do orçamento consumido` 
+                        : `${cat.percent.toFixed(1)}% do total mensal`
+                      }
+                    </span>
                   </div>
-                  <div className="progress-bar-container">
-                    <div 
-                      className="progress-bar-fill" 
-                      style={{ width: `${cat.percent}%` }}
-                    ></div>
-                  </div>
-                  <span className="category-percent">{cat.percent.toFixed(1)}% do total mensal</span>
-                </div>
-              ))
+                );
+              })
             ) : (
               <p className="empty-state">Nenhuma despesa registrada este mês.</p>
             )}

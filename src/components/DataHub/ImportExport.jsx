@@ -1,33 +1,87 @@
-import React, { useState } from 'react';
-import { UploadCloud, Download, CheckCircle2, AlertCircle, FileSpreadsheet, FileCode, Check, X } from 'lucide-react';
+import React, { useState, useContext } from 'react';
+import { UploadCloud, Download, CheckCircle2, AlertCircle, FileSpreadsheet, FileCode, Check, X, Shield } from 'lucide-react';
 import { parseOFX, parseCSV } from '../../utils/parser';
 import { formatBRL } from '../../utils/financeUtils';
+import { FinanceContext } from '../../context/FinanceContext';
+import { encryptData, decryptData } from '../../utils/cryptoUtils';
 
-const ImportExport = ({ accounts, transactions, dependents, investments, reminders, documents, onAddTransaction }) => {
+const ImportExport = () => {
+  const { 
+    accounts, 
+    transactions, 
+    dependents, 
+    investments, 
+    reminders, 
+    documents, 
+    budgets,
+    settings,
+    investmentGoal,
+    profile,
+    sessionKey,
+    addTransaction,
+    restoreFullBackup
+  } = useContext(FinanceContext);
+
   const [importedTxCount, setImportedTxCount] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [fileName, setFileName] = useState('');
   const [previewTransactions, setPreviewTransactions] = useState([]);
   const [selectedAccountId, setSelectedAccountId] = useState(accounts[0]?.id || '');
+  const [backupSuccessMsg, setBackupSuccessMsg] = useState('');
+  const [backupErrorMsg, setBackupErrorMsg] = useState('');
 
-  const handleExportData = () => {
-    const fullBackup = {
-      accounts,
-      transactions,
-      dependents,
-      investments,
-      reminders,
-      documents,
-      exportedAt: new Date().toISOString()
-    };
+  const handleExportData = async (encrypted = true) => {
+    try {
+      const fullBackup = {
+        accounts,
+        transactions,
+        dependents,
+        investments,
+        reminders,
+        documents,
+        budgets,
+        settings,
+        investmentGoal,
+        profile,
+        exportedAt: new Date().toISOString()
+      };
 
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(fullBackup, null, 2));
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `WealthManager_Backup_${new Date().toISOString().substring(0, 10)}.json`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
+      let downloadData;
+      let filename;
+
+      if (encrypted) {
+        if (!sessionKey) {
+          setBackupErrorMsg("Sessão travada. Desbloqueie a carteira para gerar backup criptografado.");
+          return;
+        }
+        const ciphertext = await encryptData(JSON.stringify(fullBackup), sessionKey);
+        downloadData = {
+          encrypted: true,
+          payload: ciphertext
+        };
+        filename = `WealthManager_EncryptedBackup_${new Date().toISOString().substring(0, 10)}.json`;
+      } else {
+        downloadData = {
+          encrypted: false,
+          ...fullBackup
+        };
+        filename = `WealthManager_UnencryptedBackup_${new Date().toISOString().substring(0, 10)}.json`;
+      }
+
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(downloadData, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", filename);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      setBackupSuccessMsg(`Backup ${encrypted ? 'criptografado' : 'aberto'} exportado com sucesso!`);
+      setTimeout(() => setBackupSuccessMsg(''), 4000);
+    } catch (err) {
+      console.error(err);
+      setBackupErrorMsg("Falha ao exportar backup.");
+      setTimeout(() => setBackupErrorMsg(''), 4000);
+    }
   };
 
   const handleFileChange = (e) => {
@@ -75,7 +129,7 @@ const ImportExport = ({ accounts, transactions, dependents, investments, reminde
 
     // Add all previewed transactions to context
     previewTransactions.forEach(tx => {
-      onAddTransaction({
+      addTransaction({
         ...tx,
         accountId: selectedAccountId
       });
@@ -193,22 +247,95 @@ const ImportExport = ({ accounts, transactions, dependents, investments, reminde
 
       {/* Export / Backup Card */}
       {previewTransactions.length === 0 && (
+        <>
         <div className="card details-card flex-column flex-between">
           <div>
             <h3>Exportar Dados e Backup</h3>
-            <p className="card-subtext mb-lg">Salve uma cópia física e completa de todos os seus lançamentos, dependentes, contas e metas financeiras.</p>
+            <p className="card-subtext mb-lg">Salve uma cópia física e completa de todos os seus lançamentos, dependentes, contas, metas e orçamentos.</p>
           </div>
           
           <div className="export-actions-box text-center flex-column gap-md">
-            <button className="btn btn-primary flex-center" onClick={handleExportData}>
+            <button className="btn btn-primary flex-center" onClick={() => handleExportData(true)} style={{ width: '100%' }}>
+              <Shield size={18} style={{ marginRight: 8 }} />
+              Exportar Criptografado (Recomendado)
+            </button>
+            <button className="btn btn-secondary flex-center" onClick={() => handleExportData(false)} style={{ width: '100%' }}>
               <Download size={18} style={{ marginRight: 8 }} />
-              Exportar Backup em JSON
+              Exportar Texto Aberto (JSON)
             </button>
             <p className="text-xxs text-secondary">
-              O backup gerado é totalmente compatível e pode ser importado de volta para restaurar seu painel de forma instantânea.
+              O backup criptografado protege seus dados financeiros com criptografia AES-GCM baseada na sua chave de sessão atual.
             </p>
           </div>
         </div>
+
+        <div className="card details-card flex-column flex-between">
+          <div>
+            <h3>Restaurar Backup Local</h3>
+            <p className="card-subtext mb-lg">Carregue um arquivo de backup JSON previamente salvo para restaurar integralmente o estado do seu painel.</p>
+          </div>
+
+          <div className="restore-actions-box flex-column gap-md" style={{ width: '100%' }}>
+            <label className="btn btn-secondary btn-sm custom-file-upload flex-center" style={{ width: '100%', padding: '12px', cursor: 'pointer' }}>
+              <UploadCloud size={18} style={{ marginRight: 8 }} />
+              <span>Carregar Backup (.JSON)</span>
+              <input 
+                type="file" 
+                accept=".json" 
+                onChange={async (e) => {
+                  const file = e.target.files[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = async (evt) => {
+                    try {
+                      const text = evt.target.result;
+                      const backup = JSON.parse(text);
+                      
+                      if (backup.encrypted) {
+                        if (!sessionKey) {
+                          setBackupErrorMsg("Desbloqueie a carteira para descriptografar o backup.");
+                          return;
+                        }
+                        const decrypted = await decryptData(backup.payload, sessionKey);
+                        const parsed = JSON.parse(decrypted);
+                        restoreFullBackup(parsed);
+                        setBackupSuccessMsg("Backup criptografado restaurado com sucesso!");
+                      } else {
+                        restoreFullBackup(backup);
+                        setBackupSuccessMsg("Backup aberto restaurado com sucesso!");
+                      }
+                      setBackupErrorMsg('');
+                      setTimeout(() => setBackupSuccessMsg(''), 4000);
+                    } catch (err) {
+                      console.error(err);
+                      setBackupErrorMsg("Erro ao restaurar backup. Verifique a senha ou o arquivo.");
+                      setBackupSuccessMsg('');
+                      setTimeout(() => setBackupErrorMsg(''), 4000);
+                    }
+                  };
+                  reader.readAsText(file);
+                  e.target.value = '';
+                }} 
+                style={{ display: 'none' }} 
+              />
+            </label>
+
+            {backupSuccessMsg && (
+              <div className="alert-message success-alert flex-center-y animate-scale-up" style={{ marginTop: '10px' }}>
+                <CheckCircle2 className="text-success" size={16} style={{ marginRight: 8 }} />
+                <span className="text-xs">{backupSuccessMsg}</span>
+              </div>
+            )}
+
+            {backupErrorMsg && (
+              <div className="alert-message error-alert flex-center-y animate-scale-up" style={{ marginTop: '10px' }}>
+                <AlertCircle className="text-danger" size={16} style={{ marginRight: 8 }} />
+                <span className="text-xs">{backupErrorMsg}</span>
+              </div>
+            )}
+          </div>
+        </div>
+        </>
       )}
     </div>
   );
