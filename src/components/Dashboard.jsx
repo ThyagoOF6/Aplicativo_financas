@@ -1,5 +1,6 @@
 import React, { useContext, useMemo } from 'react';
 import { FinanceContext } from '../context/FinanceContext';
+import { formatBRL } from '../utils/financeUtils';
 import { 
   TrendingUp, 
   Wallet, 
@@ -19,12 +20,10 @@ const Dashboard = ({ setActiveTab }) => {
     investments, 
     transactions, 
     reminders,
-    profile
+    profile,
+    username
   } = useContext(FinanceContext);
 
-  const formatCurrency = (val) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
-  };
 
   // Calculations
   const totalAccounts = useMemo(() => accounts.reduce((acc, curr) => acc + curr.balance, 0), [accounts]);
@@ -32,7 +31,8 @@ const Dashboard = ({ setActiveTab }) => {
   const netWorth = totalAccounts + totalInvested;
 
   // Monthly flow
-  const referenceMonthStr = '2026-06';
+  const referenceMonthStr = new Date().toISOString().substring(0, 7);
+  const currentMonthLabel = new Date().toLocaleDateString('pt-BR', { month: 'long' }).replace(/^\w/, c => c.toUpperCase());
   
   const { monthlyTransactions, incomeThisMonth, expenseThisMonth } = useMemo(() => {
     const mTx = transactions.filter(t => t.date.startsWith(referenceMonthStr));
@@ -110,7 +110,7 @@ const Dashboard = ({ setActiveTab }) => {
       {/* Welcome & Net Worth Header */}
       <section className="dashboard-intro">
         <div className="intro-text">
-          <h1>Olá, Thyago</h1>
+          <h1>Olá, {username || 'Investidor'}</h1>
           <p>Veja o resumo consolidado do seu patrimônio e fluxo de caixa.</p>
         </div>
         <div className="quick-actions-bar">
@@ -148,7 +148,7 @@ const Dashboard = ({ setActiveTab }) => {
             <Wallet className="card-icon text-accent" size={20} />
           </div>
           <div className="card-body">
-            <h2 className="amount-primary">{formatCurrency(totalAccounts)}</h2>
+            <h2 className="amount-primary">{formatBRL(totalAccounts)}</h2>
             <p className="card-subtext">Total líquido em contas correntes e espécie</p>
           </div>
         </div>
@@ -159,7 +159,7 @@ const Dashboard = ({ setActiveTab }) => {
             <TrendingUp className="card-icon text-success" size={20} />
           </div>
           <div className="card-body">
-            <h2 className="amount-primary">{formatCurrency(totalInvested)}</h2>
+            <h2 className="amount-primary">{formatBRL(totalInvested)}</h2>
             <p className="card-subtext">Fundos, Renda Fixa e Ações</p>
           </div>
         </div>
@@ -170,7 +170,7 @@ const Dashboard = ({ setActiveTab }) => {
             <div className="card-badge">Foco de IR</div>
           </div>
           <div className="card-body">
-            <h2 className="amount-highlight">{formatCurrency(netWorth)}</h2>
+            <h2 className="amount-highlight">{formatBRL(netWorth)}</h2>
             <p className="card-subtext">Bens declaráveis e saldos consolidados</p>
           </div>
         </div>
@@ -181,8 +181,8 @@ const Dashboard = ({ setActiveTab }) => {
         {/* Despesas por Categoria */}
         <div className="card details-card main-col">
           <div className="card-header flex-between">
-            <h3>Gastos por Categoria (Junho)</h3>
-            <span className="text-secondary text-sm">Total: {formatCurrency(expenseThisMonth)}</span>
+            <h3>Gastos por Categoria ({currentMonthLabel})</h3>
+            <span className="text-secondary text-sm">Total: {formatBRL(expenseThisMonth)}</span>
           </div>
           <div className="category-list">
             {expenseCategories.length > 0 ? (
@@ -190,7 +190,7 @@ const Dashboard = ({ setActiveTab }) => {
                 <div key={cat.name} className="category-item">
                   <div className="category-item-info flex-between">
                     <span className="category-name">{cat.name}</span>
-                    <span className="category-amount font-semibold">{formatCurrency(cat.amount)}</span>
+                    <span className="category-amount font-semibold">{formatBRL(cat.amount)}</span>
                   </div>
                   <div className="progress-bar-container">
                     <div 
@@ -225,7 +225,7 @@ const Dashboard = ({ setActiveTab }) => {
                         <p className="reminder-date">Vence em: {rem.dueDate.split('-').reverse().join('/')}</p>
                       </div>
                     </div>
-                    <span className="reminder-amount font-semibold">{formatCurrency(rem.amount)}</span>
+                    <span className="reminder-amount font-semibold">{formatBRL(rem.amount)}</span>
                   </div>
                 ))
               ) : (
@@ -261,7 +261,7 @@ const Dashboard = ({ setActiveTab }) => {
                     </div>
                   </div>
                   <span className={`tx-amount font-semibold ${tx.type === 'income' ? 'text-success' : ''}`}>
-                    {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount)}
+                    {tx.type === 'income' ? '+' : '-'}{formatBRL(tx.amount)}
                   </span>
                 </div>
               ))}

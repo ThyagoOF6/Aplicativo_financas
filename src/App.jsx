@@ -1,5 +1,6 @@
 import React, { useState, useContext, useEffect, Suspense, lazy } from 'react';
 import { FinanceProvider, FinanceContext } from './context/FinanceContext';
+import { ToastProvider } from './components/layout/Toast';
 import Sidebar from './components/layout/Sidebar';
 import TopNav from './components/layout/TopNav';
 import LockScreen from './components/layout/LockScreen';
@@ -104,9 +105,11 @@ function MainContent() {
 
 function App() {
   return (
-    <FinanceProvider>
-      <MainContent />
-    </FinanceProvider>
+    <ToastProvider>
+      <FinanceProvider>
+        <MainContent />
+      </FinanceProvider>
+    </ToastProvider>
   );
 }
 

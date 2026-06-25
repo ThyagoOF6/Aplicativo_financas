@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
-import { Trash2, Search, FileText } from 'lucide-react';
+import { Trash2, Edit2, Search, FileText } from 'lucide-react';
 import { formatBRL } from '../../utils/financeUtils';
+import ConfirmDialog from '../layout/ConfirmDialog';
+import { useToast } from '../layout/Toast';
 
-const TransactionList = ({ transactions, accounts, dependents, onDelete }) => {
+const TransactionList = ({ transactions, accounts, dependents, onDelete, onEdit }) => {
+  const { addToast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   const [visibleCount, setVisibleCount] = useState(20);
 
@@ -108,14 +112,18 @@ const TransactionList = ({ transactions, accounts, dependents, onDelete }) => {
                       <td className={`font-semibold ${tx.type === 'income' ? 'text-success' : 'text-danger'}`}>
                         {tx.type === 'income' ? '+' : '-'}{formatBRL(tx.amount)}
                       </td>
-                      <td>
+                      <td style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                         <button 
                           className="delete-icon-btn" 
-                          onClick={() => {
-                            if (confirm('Deseja excluir esta transação? Seu saldo será recalculado.')) {
-                              onDelete(tx.id);
-                            }
-                          }}
+                          onClick={() => onEdit(tx)}
+                          title="Editar transação"
+                          style={{ color: 'var(--accent-color)' }}
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button 
+                          className="delete-icon-btn" 
+                          onClick={() => setConfirmDelete(tx)}
                           title="Remover transação"
                         >
                           <Trash2 size={16} />
@@ -145,6 +153,20 @@ const TransactionList = ({ transactions, accounts, dependents, onDelete }) => {
           </button>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={!!confirmDelete}
+        title="Excluir Transação"
+        message={confirmDelete ? `Deseja excluir "${confirmDelete.description}"? O saldo da conta será recalculado automaticamente.` : ''}
+        confirmLabel="Excluir"
+        variant="danger"
+        onConfirm={() => {
+          onDelete(confirmDelete.id);
+          addToast(`Transação "${confirmDelete.description}" removida com sucesso.`, 'success');
+          setConfirmDelete(null);
+        }}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 };

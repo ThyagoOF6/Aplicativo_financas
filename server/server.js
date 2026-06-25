@@ -3,6 +3,7 @@ import cors from 'cors';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
+import rateLimit from 'express-rate-limit';
 import pool from './db.js';
 
 dotenv.config();
@@ -10,8 +11,31 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+// Validate mandatory secrets on startup
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET environment variable is not set. Server cannot start securely.');
+  process.exit(1);
+}
+
+app.use(cors({
+  origin: [
+    'http://localhost:5173',
+    'http://localhost:4173',
+    'http://localhost:3000'
+  ],
+  credentials: true
+}));
 app.use(express.json({ limit: '10mb' })); // Allow sync of relatively large encrypted JSON state
+
+// Rate limiter for auth endpoints (brute-force protection)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // 10 attempts per window
+  message: { error: 'Muitas tentativas de login. Tente novamente em 15 minutos.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
 
 // JWT Verification Middleware
 function authenticate(req, res, next) {
@@ -22,7 +46,7 @@ function authenticate(req, res, next) {
     return res.status(401).json({ error: 'Authorization token missing' });
   }
 
-  jwt.verify(token, process.env.JWT_SECRET || 'default_secret_key', (err, userPayload) => {
+  jwt.verify(token, JWT_SECRET, (err, userPayload) => {
     if (err) {
       return res.status(403).json({ error: 'Token invalid or expired' });
     }
@@ -52,7 +76,7 @@ app.get('/api/auth/salt', async (req, res) => {
 });
 
 // 2. Register user
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', authLimiter, async (req, res) => {
   const { username, auth_hash, security_salt, security_verify } = req.body;
   if (!username || !auth_hash || !security_salt || !security_verify) {
     return res.status(400).json({ error: 'Missing required registration parameters' });
@@ -72,7 +96,7 @@ app.post('/api/auth/register', async (req, res) => {
 
     const token = jwt.sign(
       { id: userId, username: username.trim() },
-      process.env.JWT_SECRET || 'default_secret_key',
+      JWT_SECRET,
       { expiresIn: '2h' }
     );
 
@@ -87,7 +111,7 @@ app.post('/api/auth/register', async (req, res) => {
 });
 
 // 3. Login verify & token generation
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', authLimiter, async (req, res) => {
   const { username, auth_hash } = req.body;
   if (!username || !auth_hash) {
     return res.status(400).json({ error: 'Username and auth_hash are required' });
@@ -107,7 +131,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     const token = jwt.sign(
       { id: user.id, username: user.username },
-      process.env.JWT_SECRET || 'default_secret_key',
+      JWT_SECRET,
       { expiresIn: '2h' }
     );
 

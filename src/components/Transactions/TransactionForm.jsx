@@ -1,17 +1,16 @@
 import React, { useState } from 'react';
 import { formatBRL } from '../../utils/financeUtils';
-import { sanitizeHTML } from '../../utils/xss';
 
-const TransactionForm = ({ accounts, dependents, onAdd, onClose }) => {
-  const [description, setDescription] = useState('');
-  const [amount, setAmount] = useState('');
-  const [type, setType] = useState('expense');
-  const [category, setCategory] = useState('Alimentação');
-  const [accountId, setAccountId] = useState(accounts[0]?.id || '');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [dependentId, setDependentId] = useState('');
-  const [isTaxDeductible, setIsTaxDeductible] = useState(false);
-  const [specificPurpose, setSpecificPurpose] = useState('');
+const TransactionForm = ({ accounts, dependents, onAdd, onClose, transactionToEdit, onUpdate }) => {
+  const [description, setDescription] = useState(transactionToEdit ? transactionToEdit.description : '');
+  const [amount, setAmount] = useState(transactionToEdit ? transactionToEdit.amount.toString() : '');
+  const [type, setType] = useState(transactionToEdit ? transactionToEdit.type : 'expense');
+  const [category, setCategory] = useState(transactionToEdit ? transactionToEdit.category : 'Alimentação');
+  const [accountId, setAccountId] = useState(transactionToEdit ? transactionToEdit.accountId : (accounts[0]?.id || ''));
+  const [date, setDate] = useState(transactionToEdit ? transactionToEdit.date : new Date().toISOString().split('T')[0]);
+  const [dependentId, setDependentId] = useState(transactionToEdit ? transactionToEdit.dependentId || '' : '');
+  const [isTaxDeductible, setIsTaxDeductible] = useState(transactionToEdit ? transactionToEdit.isTaxDeductible : false);
+  const [specificPurpose, setSpecificPurpose] = useState(transactionToEdit ? transactionToEdit.specificPurpose || '' : '');
 
   const getCategoryOptions = () => {
     if (type === 'income') {
@@ -33,8 +32,8 @@ const TransactionForm = ({ accounts, dependents, onAdd, onClose }) => {
     e.preventDefault();
     if (!description || !amount || !accountId) return;
 
-    onAdd({
-      description: sanitizeHTML(description),
+    const txData = {
+      description: description.trim(),
       amount: parseFloat(amount),
       type,
       category,
@@ -42,22 +41,29 @@ const TransactionForm = ({ accounts, dependents, onAdd, onClose }) => {
       date,
       dependentId,
       isTaxDeductible: type === 'expense' ? isTaxDeductible : false,
-      specificPurpose: sanitizeHTML(specificPurpose)
-    });
+      specificPurpose: specificPurpose.trim()
+    };
 
-    // Reset Form
-    setDescription('');
-    setAmount('');
-    setDate(new Date().toISOString().split('T')[0]);
-    setDependentId('');
-    setIsTaxDeductible(false);
-    setSpecificPurpose('');
+    if (transactionToEdit) {
+      onUpdate({ ...txData, id: transactionToEdit.id });
+    } else {
+      onAdd(txData);
+    }
+
+    if (!transactionToEdit) {
+      setDescription('');
+      setAmount('');
+      setDate(new Date().toISOString().split('T')[0]);
+      setDependentId('');
+      setIsTaxDeductible(false);
+      setSpecificPurpose('');
+    }
     onClose();
   };
 
   return (
     <form onSubmit={handleSubmit} className="card form-card animate-slide-down">
-      <h3>Lançar Transação</h3>
+      <h3>{transactionToEdit ? 'Editar Transação' : 'Lançar Transação'}</h3>
       <div className="form-grid">
         <div className="form-group">
           <label htmlFor="tx-type">Tipo</label>
@@ -174,7 +180,7 @@ const TransactionForm = ({ accounts, dependents, onAdd, onClose }) => {
       </div>
 
       <div className="form-actions">
-        <button type="submit" className="btn btn-primary">Adicionar Transação</button>
+        <button type="submit" className="btn btn-primary">{transactionToEdit ? 'Salvar Alterações' : 'Adicionar Transação'}</button>
         <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>
       </div>
     </form>

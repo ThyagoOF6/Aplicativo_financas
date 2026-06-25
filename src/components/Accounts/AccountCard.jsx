@@ -1,8 +1,8 @@
 import React from 'react';
-import { Trash2, ShieldCheck, ShieldAlert, Landmark, CreditCard, Coins } from 'lucide-react';
+import { Trash2, Edit2, ShieldCheck, ShieldAlert, Landmark, CreditCard, Coins } from 'lucide-react';
 import { formatBRL } from '../../utils/financeUtils';
 
-const AccountCard = ({ acc, onDelete }) => {
+const AccountCard = ({ acc, onDeleteRequest, onEdit }) => {
   const getAccountIcon = (type) => {
     switch (type) {
       case 'Banco':
@@ -25,17 +25,23 @@ const AccountCard = ({ acc, onDelete }) => {
           {getAccountIcon(acc.type)}
           <span className="account-type-tag text-xs font-semibold">{acc.type}</span>
         </div>
-        <button 
-          className="delete-icon-btn" 
-          onClick={() => {
-            if (confirm(`Excluir conta ${acc.name}?`)) {
-              onDelete(acc.id);
-            }
-          }}
-          title="Remover Conta"
-        >
-          <Trash2 size={16} />
-        </button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button 
+            className="delete-icon-btn" 
+            onClick={() => onEdit(acc)}
+            title="Editar Conta"
+            style={{ color: 'var(--accent-color)', background: 'none', border: 'none', cursor: 'pointer' }}
+          >
+            <Edit2 size={16} />
+          </button>
+          <button 
+            className="delete-icon-btn" 
+            onClick={() => onDeleteRequest(acc)}
+            title="Remover Conta"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
       </div>
 
       <div className="account-card-body">

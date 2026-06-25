@@ -1,7 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { FinanceContext } from '../../context/FinanceContext';
 import { UploadCloud, FileText, Trash2, CheckCircle2, ShieldCheck, Download, Loader2 } from 'lucide-react';
-import { sanitizeHTML } from '../../utils/xss';
 import { saveEncryptedFile, getEncryptedFile, deleteFileFromDB } from '../../utils/indexedDbUtils';
 import { encryptData, decryptData } from '../../utils/cryptoUtils';
 
@@ -40,7 +39,7 @@ const DocumentVault = ({ documents, onAdd, onDelete }) => {
     reader.onload = async (event) => {
       try {
         const base64Data = event.target.result; // data:...;base64,...
-        const id = Date.now().toString();
+        const id = crypto.randomUUID();
         
         // 1. Encrypt the file data
         const encrypted = await encryptData(base64Data, sessionKey);
@@ -51,7 +50,7 @@ const DocumentVault = ({ documents, onAdd, onDelete }) => {
         // 3. Save metadata in context
         onAdd({
           id,
-          name: sanitizeHTML(selectedFile.name),
+          name: selectedFile.name,
           type: docType,
           date: new Date().toISOString().split('T')[0],
           size: formatFileSize(selectedFile.size)

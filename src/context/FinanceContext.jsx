@@ -165,7 +165,7 @@ export const FinanceProvider = ({ children }) => {
     if (!isLocked && sessionKey && jwtToken) {
       const timeout = setTimeout(() => {
         syncWithCloud();
-      }, 1000);
+      }, 5000);
       return () => clearTimeout(timeout);
     }
   }, [accounts, dependents, transactions, reminders, investments, documents, profile, investmentGoal, isLocked, sessionKey, jwtToken, syncWithCloud]);
@@ -467,7 +467,7 @@ export const FinanceProvider = ({ children }) => {
 
   // CRUD Operations (wrapped in useCallback for performance optimization)
   const addAccount = useCallback((account) => {
-    setAccounts(prev => [...prev, { ...account, id: Date.now().toString(), balance: parseFloat(account.balance) }]);
+    setAccounts(prev => [...prev, { ...account, id: crypto.randomUUID(), balance: parseFloat(account.balance) }]);
   }, []);
 
   const updateAccountBalance = useCallback((accountId, amount, type) => {
@@ -484,10 +484,17 @@ export const FinanceProvider = ({ children }) => {
     setAccounts(prev => prev.filter(acc => acc.id !== id));
   }, []);
 
+  const updateAccount = useCallback((updatedAcc) => {
+    setAccounts(prev => prev.map(acc => acc.id === updatedAcc.id ? {
+      ...updatedAcc,
+      balance: parseFloat(updatedAcc.balance)
+    } : acc));
+  }, []);
+
   const addTransaction = useCallback((transaction) => {
     const newTx = {
       ...transaction,
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       amount: parseFloat(transaction.amount),
       date: transaction.date || new Date().toISOString().split('T')[0]
     };
@@ -496,16 +503,33 @@ export const FinanceProvider = ({ children }) => {
   }, [updateAccountBalance]);
 
   const deleteTransaction = useCallback((id) => {
-    const tx = transactions.find(t => t.id === id);
-    if (tx) {
-      const revertType = tx.type === 'income' ? 'expense' : 'income';
-      updateAccountBalance(tx.accountId, tx.amount, revertType);
-    }
-    setTransactions(prev => prev.filter(t => t.id !== id));
-  }, [transactions, updateAccountBalance]);
+    setTransactions(prev => {
+      const tx = prev.find(t => t.id === id);
+      if (tx) {
+        const revertType = tx.type === 'income' ? 'expense' : 'income';
+        updateAccountBalance(tx.accountId, tx.amount, revertType);
+      }
+      return prev.filter(t => t.id !== id);
+    });
+  }, [updateAccountBalance]);
+
+  const updateTransaction = useCallback((updatedTx) => {
+    setTransactions(prev => {
+      const oldTx = prev.find(t => t.id === updatedTx.id);
+      if (oldTx) {
+        const revertType = oldTx.type === 'income' ? 'expense' : 'income';
+        updateAccountBalance(oldTx.accountId, oldTx.amount, revertType);
+      }
+      updateAccountBalance(updatedTx.accountId, parseFloat(updatedTx.amount), updatedTx.type);
+      return prev.map(t => t.id === updatedTx.id ? {
+        ...updatedTx,
+        amount: parseFloat(updatedTx.amount)
+      } : t);
+    });
+  }, [updateAccountBalance]);
 
   const addDependent = useCallback((dep) => {
-    setDependents(prev => [...prev, { ...dep, id: Date.now().toString() }]);
+    setDependents(prev => [...prev, { ...dep, id: crypto.randomUUID() }]);
   }, []);
 
   const deleteDependent = useCallback((id) => {
@@ -513,7 +537,7 @@ export const FinanceProvider = ({ children }) => {
   }, []);
 
   const addReminder = useCallback((rem) => {
-    setReminders(prev => [...prev, { ...rem, id: Date.now().toString(), amount: parseFloat(rem.amount), paid: false }]);
+    setReminders(prev => [...prev, { ...rem, id: crypto.randomUUID(), amount: parseFloat(rem.amount), paid: false }]);
   }, []);
 
   const toggleReminderPaid = useCallback((id) => {
@@ -537,7 +561,7 @@ export const FinanceProvider = ({ children }) => {
 
     setInvestments(prev => [...prev, { 
       ...inv, 
-      id: Date.now().toString(), 
+      id: crypto.randomUUID(), 
       quantity,
       averagePrice,
       currentPrice,
@@ -548,6 +572,22 @@ export const FinanceProvider = ({ children }) => {
 
   const deleteInvestment = useCallback((id) => {
     setInvestments(prev => prev.filter(i => i.id !== id));
+  }, []);
+
+  const updateInvestment = useCallback((updatedInv) => {
+    const quantity = parseFloat(updatedInv.quantity) || 0;
+    const currentPrice = parseFloat(updatedInv.currentPrice) || 0;
+    const averagePrice = parseFloat(updatedInv.averagePrice) || 0;
+    const value = quantity * currentPrice;
+
+    setInvestments(prev => prev.map(inv => inv.id === updatedInv.id ? {
+      ...updatedInv,
+      quantity,
+      averagePrice,
+      currentPrice,
+      value,
+      yieldRate: parseFloat(updatedInv.yieldRate)
+    } : inv));
   }, []);
 
   const updateInvestmentPrices = useCallback((priceMap) => {
@@ -566,7 +606,7 @@ export const FinanceProvider = ({ children }) => {
   }, []);
 
   const addDocument = useCallback((doc) => {
-    setDocuments(prev => [...prev, { ...doc, id: Date.now().toString() }]);
+    setDocuments(prev => [...prev, { ...doc, id: crypto.randomUUID() }]);
   }, []);
 
   const deleteDocument = useCallback((id) => {
@@ -593,8 +633,10 @@ export const FinanceProvider = ({ children }) => {
       lockWallet,
       addAccount,
       deleteAccount,
+      updateAccount,
       addTransaction,
       deleteTransaction,
+      updateTransaction,
       addDependent,
       deleteDependent,
       addReminder,
@@ -602,6 +644,7 @@ export const FinanceProvider = ({ children }) => {
       deleteReminder,
       addInvestment,
       deleteInvestment,
+      updateInvestment,
       updateInvestmentPrices,
       addDocument,
       deleteDocument,

@@ -1,5 +1,5 @@
 import React, { useState, useContext } from 'react';
-import { Plus, Trash2, LineChart, TrendingUp, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Plus, Trash2, Edit2, LineChart, TrendingUp, AlertTriangle, RefreshCw } from 'lucide-react';
 import { 
   calculateAverageYield, 
   calculateRealYield, 
@@ -8,11 +8,16 @@ import {
   fetchAssetPrice
 } from '../../utils/financeUtils';
 import { FinanceContext } from '../../context/FinanceContext';
+import ConfirmDialog from '../layout/ConfirmDialog';
+import { useToast } from '../layout/Toast';
 
 const InvestmentAdvisor = ({ investments, onAdd, onDelete }) => {
-  const { profile, updateInvestmentPrices } = useContext(FinanceContext);
+  const { profile, updateInvestmentPrices, updateInvestment } = useContext(FinanceContext);
+  const { addToast } = useToast();
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   const [showForm, setShowForm] = useState(false);
+  const [editingInvestment, setEditingInvestment] = useState(null);
   const [name, setName] = useState('');
   const [type, setType] = useState('Renda Fixa');
   const [quantity, setQuantity] = useState('');
@@ -25,21 +30,21 @@ const InvestmentAdvisor = ({ investments, onAdd, onDelete }) => {
   const [monthlyAporte, setMonthlyAporte] = useState(1000);
   const [projectionYears, setProjectionYears] = useState(5);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!name || !quantity || !averagePrice || !currentPrice || !yieldRate) return;
+  const handleEditClick = (inv) => {
+    setEditingInvestment(inv);
+    setName(inv.name);
+    setType(inv.type);
+    setQuantity(inv.quantity.toString());
+    setAveragePrice(inv.averagePrice.toString());
+    setCurrentPrice(inv.currentPrice.toString());
+    setYieldRate(inv.yieldRate.toString());
+    setIpcaCoverage(inv.ipcaCoverage || false);
+    setShowForm(true);
+  };
 
-    onAdd({
-      name,
-      type,
-      quantity: parseFloat(quantity),
-      averagePrice: parseFloat(averagePrice),
-      currentPrice: parseFloat(currentPrice),
-      yieldRate: parseFloat(yieldRate),
-      buyDate: new Date().toISOString().split('T')[0],
-      ipcaCoverage
-    });
-
+  const handleFormClose = () => {
+    setShowForm(false);
+    setEditingInvestment(null);
     setName('');
     setType('Renda Fixa');
     setQuantity('');
@@ -47,7 +52,38 @@ const InvestmentAdvisor = ({ investments, onAdd, onDelete }) => {
     setCurrentPrice('');
     setYieldRate('');
     setIpcaCoverage(false);
-    setShowForm(false);
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!name || !quantity || !averagePrice || !currentPrice || !yieldRate) return;
+
+    const invData = {
+      name,
+      type,
+      quantity: parseFloat(quantity),
+      averagePrice: parseFloat(averagePrice),
+      currentPrice: parseFloat(currentPrice),
+      yieldRate: parseFloat(yieldRate),
+      ipcaCoverage
+    };
+
+    if (editingInvestment) {
+      updateInvestment({
+        ...invData,
+        id: editingInvestment.id,
+        buyDate: editingInvestment.buyDate || new Date().toISOString().split('T')[0]
+      });
+      addToast(`Ativo "${name}" atualizado com sucesso!`, 'success');
+    } else {
+      onAdd({
+        ...invData,
+        buyDate: new Date().toISOString().split('T')[0]
+      });
+      addToast(`Ativo "${name}" adicionado à carteira com sucesso.`, 'success');
+    }
+
+    handleFormClose();
   };
 
   const [updatingPrices, setUpdatingPrices] = useState(false);
@@ -65,6 +101,7 @@ const InvestmentAdvisor = ({ investments, onAdd, onDelete }) => {
       }
     }
     updateInvestmentPrices(priceMap);
+    addToast('Cotações atualizadas com sucesso!', 'success');
     setUpdatingPrices(false);
   };
 
@@ -129,6 +166,7 @@ const InvestmentAdvisor = ({ investments, onAdd, onDelete }) => {
   };
 
   return (
+    <>
     <div className="advisor-grid animate-fade-in flex-column gap-lg">
       {/* Header Stats */}
       <div className="advisor-stats-cards">
@@ -175,16 +213,22 @@ const InvestmentAdvisor = ({ investments, onAdd, onDelete }) => {
                 <RefreshCw size={14} className={updatingPrices ? 'animate-spin' : ''} style={{ marginRight: 6 }} />
                 {updatingPrices ? 'Atualizando...' : 'Atualizar Cotações'}
               </button>
-              <button className="btn btn-primary btn-sm flex-center" onClick={() => setShowForm(!showForm)}>
+              <button className="btn btn-primary btn-sm flex-center" onClick={() => {
+                if (showForm) {
+                  handleFormClose();
+                } else {
+                  setShowForm(true);
+                }
+              }}>
                 <Plus size={14} style={{ marginRight: 4 }} />
-                Novo Ativo
+                {showForm ? 'Fechar Form' : 'Novo Ativo'}
               </button>
             </div>
           </div>
 
           {showForm && (
             <form onSubmit={handleSubmit} className="card form-card mb-md animate-slide-down">
-              <h4>Adicionar Ativo à Carteira</h4>
+              <h4>{editingInvestment ? 'Editar Ativo da Carteira' : 'Adicionar Ativo à Carteira'}</h4>
               <div className="form-grid">
                 <div className="form-group">
                   <label htmlFor="inv-name">Nome do Ativo</label>
@@ -271,8 +315,8 @@ const InvestmentAdvisor = ({ investments, onAdd, onDelete }) => {
                 </div>
               </div>
               <div className="form-actions">
-                <button type="submit" className="btn btn-primary btn-sm">Salvar Ativo</button>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowForm(false)}>Cancelar</button>
+                <button type="submit" className="btn btn-primary btn-sm">{editingInvestment ? 'Salvar Alterações' : 'Salvar Ativo'}</button>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={handleFormClose}>Cancelar</button>
               </div>
             </form>
           )}
@@ -328,14 +372,18 @@ const InvestmentAdvisor = ({ investments, onAdd, onDelete }) => {
                         </span>
                         {inv.ipcaCoverage && <span className="text-xxs text-secondary block">Proteção IPCA</span>}
                       </td>
-                      <td>
+                      <td style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                         <button 
                           className="delete-icon-btn" 
-                          onClick={() => {
-                            if (confirm(`Remover ativo ${inv.name}?`)) {
-                              onDelete(inv.id);
-                            }
-                          }}
+                          onClick={() => handleEditClick(inv)}
+                          title="Editar Ativo"
+                          style={{ color: 'var(--accent-color)', background: 'none', border: 'none', cursor: 'pointer' }}
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button 
+                          className="delete-icon-btn" 
+                          onClick={() => setConfirmDelete(inv)}
                           title="Remover Ativo"
                         >
                           <Trash2 size={16} />
@@ -472,6 +520,21 @@ const InvestmentAdvisor = ({ investments, onAdd, onDelete }) => {
         </div>
       </div>
     </div>
+
+    <ConfirmDialog
+      isOpen={!!confirmDelete}
+      title="Remover Ativo"
+      message={confirmDelete ? `Deseja remover "${confirmDelete.name}" da sua carteira? Esta ação não pode ser desfeita.` : ''}
+      confirmLabel="Remover"
+      variant="danger"
+      onConfirm={() => {
+        onDelete(confirmDelete.id);
+        addToast(`Ativo "${confirmDelete.name}" removido da carteira.`, 'success');
+        setConfirmDelete(null);
+      }}
+      onCancel={() => setConfirmDelete(null)}
+    />
+    </>
   );
 };
 

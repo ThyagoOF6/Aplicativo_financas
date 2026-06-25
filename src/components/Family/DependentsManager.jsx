@@ -2,7 +2,6 @@ import React, { useContext, useState } from 'react';
 import { FinanceContext } from '../../context/FinanceContext';
 import { UserPlus, Users, Trash2 } from 'lucide-react';
 import { formatBRL } from '../../utils/financeUtils';
-import { sanitizeHTML } from '../../utils/xss';
 
 const DependentsManager = () => {
   const { dependents, transactions, addDependent, deleteDependent } = useContext(FinanceContext);
@@ -15,7 +14,7 @@ const DependentsManager = () => {
     if (!name) return;
 
     addDependent({
-      name: sanitizeHTML(name),
+      name,
       relationship
     });
 

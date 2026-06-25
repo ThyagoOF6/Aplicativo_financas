@@ -1,5 +1,6 @@
 import React, { useContext, useState } from 'react';
 import { FinanceContext } from '../../context/FinanceContext';
+import { formatBRL } from '../../utils/financeUtils';
 import { 
   DollarSign, 
   Wallet, 
@@ -46,17 +47,15 @@ const TopNav = () => {
   // Monthly balance calculation (Income - Expense for current month)
   const currentMonthStr = new Date().toISOString().substring(0, 7); // "YYYY-MM"
   
-  // For demo consistency (since initial mock data is set to 2026-06)
-  const referenceMonthStr = '2026-06'; 
+  // For dynamic month reference
+  const referenceMonthStr = new Date().toISOString().substring(0, 7);
 
   const monthlyTransactions = transactions.filter(t => t.date.startsWith(referenceMonthStr));
   const monthlyIncome = monthlyTransactions.filter(t => t.type === 'income').reduce((acc, curr) => acc + curr.amount, 0);
   const monthlyExpense = monthlyTransactions.filter(t => t.type === 'expense').reduce((acc, curr) => acc + curr.amount, 0);
   const monthlySavings = monthlyIncome - monthlyExpense;
 
-  const formatCurrency = (val) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
-  };
+
 
   const getSyncIcon = (status) => {
     switch (status) {
@@ -151,7 +150,7 @@ const TopNav = () => {
             </div>
             <div className="stat-pill-info">
               <span className="stat-pill-label">Patrimônio Líquido</span>
-              <span className="stat-pill-value">{formatCurrency(netWorth)}</span>
+              <span className="stat-pill-value">{formatBRL(netWorth)}</span>
             </div>
           </div>
 
@@ -161,7 +160,7 @@ const TopNav = () => {
             </div>
             <div className="stat-pill-info">
               <span className="stat-pill-label">Dinheiro em Espécie</span>
-              <span className="stat-pill-value">{formatCurrency(cashBalance)}</span>
+              <span className="stat-pill-value">{formatBRL(cashBalance)}</span>
             </div>
           </div>
 
@@ -172,7 +171,7 @@ const TopNav = () => {
             <div className="stat-pill-info">
               <span className="stat-pill-label">Resultado do Mês</span>
               <span className={`stat-pill-value ${monthlySavings >= 0 ? 'text-success' : 'text-danger'}`}>
-                {monthlySavings >= 0 ? '+' : ''}{formatCurrency(monthlySavings)}
+                {monthlySavings >= 0 ? '+' : ''}{formatBRL(monthlySavings)}
               </span>
             </div>
           </div>
@@ -194,7 +193,7 @@ const TopNav = () => {
 
         <div className="topnav-profile">
           <div className="profile-info">
-            <span className="profile-name">Thyago F.</span>
+            <span className="profile-name">{username || 'Usuário'}</span>
             <span className="profile-role">Plano VIP</span>
           </div>
           <div className="profile-avatar">

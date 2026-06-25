@@ -16,8 +16,9 @@ const ReportGenerator = () => {
 
   // Filter transactions based on selected period
   const periodTx = useMemo(() => {
-    const refYear = 2026;
-    const refMonthIdx = 5; // June (0-indexed)
+    const now = new Date();
+    const refYear = now.getFullYear();
+    const refMonthIdx = now.getMonth(); // 0-indexed
 
     return transactions.filter(t => {
       const txDate = new Date(t.date);
@@ -27,9 +28,11 @@ const ReportGenerator = () => {
       if (period === 'mensal') {
         return txYear === refYear && txMonth === refMonthIdx;
       } else if (period === 'trimestral') {
-        return txYear === refYear && txMonth >= 3 && txMonth <= 5;
+        const qStart = Math.floor(refMonthIdx / 3) * 3;
+        return txYear === refYear && txMonth >= qStart && txMonth <= refMonthIdx;
       } else if (period === 'semestral') {
-        return txYear === refYear && txMonth >= 0 && txMonth <= 5;
+        const sStart = refMonthIdx < 6 ? 0 : 6;
+        return txYear === refYear && txMonth >= sStart && txMonth <= refMonthIdx;
       } else {
         return txYear === refYear;
       }
@@ -59,15 +62,29 @@ const ReportGenerator = () => {
   }, [periodTx, totalExpense]);
 
   // SVG Line Chart coordinates for evolution
-  const { points, linePath, areaPath } = useMemo(() => {
-    const historicalNetWorth = [
-      netWorth * 0.82,  // Jan
-      netWorth * 0.85,  // Feb
-      netWorth * 0.89,  // Mar
-      netWorth * 0.93,  // Apr
-      netWorth * 0.96,  // May
-      netWorth          // Jun (Current)
-    ];
+  const { points, linePath, areaPath, growthPct, monthLabels } = useMemo(() => {
+    const months = [];
+    const labels = [];
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push(d.toISOString().substring(0, 7));
+      labels.push(d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '').replace(/^\w/, c => c.toUpperCase()));
+    }
+
+    const historicalNetWorth = new Array(6);
+    historicalNetWorth[5] = netWorth;
+
+    // Calculate backwards
+    for (let i = 4; i >= 0; i--) {
+      const targetMonth = months[i + 1];
+      const monthlyTx = transactions.filter(t => t.date && t.date.startsWith(targetMonth));
+      const income = monthlyTx.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+      const expense = monthlyTx.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+      const netChange = income - expense;
+      
+      historicalNetWorth[i] = Math.max(0, historicalNetWorth[i + 1] - netChange);
+    }
 
     const maxNW = Math.max(...historicalNetWorth) * 1.1;
     const minNW = Math.min(...historicalNetWorth) * 0.9;
@@ -81,9 +98,10 @@ const ReportGenerator = () => {
 
     const lPath = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
     const aPath = `${lPath} L ${pts[pts.length - 1].x} 220 L ${pts[0].x} 220 Z`;
+    const growth = historicalNetWorth[0] > 0 ? ((netWorth / historicalNetWorth[0] - 1) * 100).toFixed(1) : '0.0';
 
-    return { points: pts, linePath: lPath, areaPath: aPath };
-  }, [netWorth]);
+    return { points: pts, linePath: lPath, areaPath: aPath, growthPct: growth, monthLabels: labels };
+  }, [netWorth, transactions]);
 
 
   return (
@@ -185,7 +203,7 @@ const ReportGenerator = () => {
               ))}
 
               {/* X Axis Labels */}
-              {['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'].map((month, idx) => (
+              {monthLabels.map((month, idx) => (
                 <text 
                   key={idx} 
                   x={50 + idx * 90} 
@@ -203,7 +221,7 @@ const ReportGenerator = () => {
           <div className="alert-message info-alert mt-md flex-center-y">
             <Info className="text-accent flex-shrink-0" size={18} style={{ marginRight: 8 }} />
             <span className="text-xs">
-              Seu patrimônio cresceu **{((netWorth / historicalNetWorth[0] - 1) * 100).toFixed(1)}%** desde Janeiro. Mantenha os aportes recorrentes para manter a curva ascendente.
+              Seu patrimônio cresceu {growthPct}% no semestre. Mantenha os aportes recorrentes para manter a curva ascendente.
             </span>
           </div>
         </div>

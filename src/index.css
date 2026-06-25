@@ -1232,3 +1232,187 @@ tbody tr:hover {
   overflow-y: auto;
 }
 
+/* ========== Toast Notification System ========== */
+.toast-container {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 11000;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  pointer-events: none;
+  max-width: 380px;
+}
+
+.toast-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: var(--border-radius-sm);
+  backdrop-filter: blur(16px) saturate(180%);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  pointer-events: all;
+  min-width: 280px;
+}
+
+.toast-message {
+  flex: 1;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.toast-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s;
+  border-radius: 4px;
+}
+
+.toast-close:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.toast-enter {
+  animation: toastSlideIn 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.toast-exit {
+  animation: toastSlideOut 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes toastSlideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes toastSlideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+/* ========== Confirm Dialog ========== */
+.confirm-dialog {
+  animation: scaleUp 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* ========== Responsive Mobile ========== */
+@media (max-width: 768px) {
+  .app-layout {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    height: auto;
+    padding: 1rem;
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .sidebar-logo {
+    display: none;
+  }
+
+  .sidebar-nav {
+    display: flex;
+    flex-direction: row;
+    gap: 0.25rem;
+    overflow-x: auto;
+    width: 100%;
+  }
+
+  .sidebar-nav-item {
+    white-space: nowrap;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+  }
+
+  .nav-item-text {
+    font-size: 0.7rem;
+  }
+
+  .sidebar-footer {
+    display: none;
+  }
+
+  .main-content-wrapper {
+    height: auto;
+    min-height: calc(100vh - 60px);
+  }
+
+  .content-container {
+    padding: 1rem;
+  }
+
+  .topnav {
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+  }
+
+  .topnav-stats {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .stat-pill {
+    min-width: calc(50% - 0.25rem);
+    flex: 1;
+  }
+
+  .dashboard-grid,
+  .dashboard-details-grid,
+  .advisor-stats-cards,
+  .advisor-panels-grid,
+  .reports-overview-grid,
+  .reports-panels-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .toast-container {
+    left: 1rem;
+    right: 1rem;
+    max-width: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .stat-pill {
+    min-width: 100%;
+  }
+
+  .topnav-profile {
+    display: none;
+  }
+}
+

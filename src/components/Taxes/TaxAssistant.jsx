@@ -26,8 +26,8 @@ const TaxAssistant = () => {
 
   // Simulated stock sales limit reminder (R$ 20.000 / month exempt)
   const monthlySalesValue = useMemo(() => {
-    // A simulação do sistema usa o mês '2026-06'
-    const targetMonth = '2026-06'; 
+    // A data do sistema é gerada dinamicamente
+    const targetMonth = new Date().toISOString().substring(0, 7); 
     
     return transactions
       .filter(t => 

@@ -2,33 +2,67 @@ import React, { useContext, useState } from 'react';
 import { FinanceContext } from '../../context/FinanceContext';
 import { Plus } from 'lucide-react';
 import AccountCard from './AccountCard';
-import { sanitizeHTML } from '../../utils/xss';
+import { useToast } from '../layout/Toast';
+import ConfirmDialog from '../layout/ConfirmDialog';
 
 const AccountManager = () => {
-  const { accounts, addAccount, deleteAccount } = useContext(FinanceContext);
+  const { accounts, addAccount, deleteAccount, updateAccount } = useContext(FinanceContext);
+  const { addToast } = useToast();
   const [showForm, setShowForm] = useState(false);
+  const [editingAccount, setEditingAccount] = useState(null);
+  const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(null);
+
   const [name, setName] = useState('');
   const [type, setType] = useState('Banco');
   const [balance, setBalance] = useState('');
   const [includeInTax, setIncludeInTax] = useState(true);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!name || !balance) return;
+  const handleEditClick = (acc) => {
+    setEditingAccount(acc);
+    setName(acc.name);
+    setType(acc.type);
+    setBalance(acc.balance.toString());
+    setIncludeInTax(acc.includeInTax);
+    setShowForm(true);
+  };
 
-    addAccount({
-      name: sanitizeHTML(name),
-      type,
-      balance: parseFloat(balance),
-      includeInTax
-    });
-
-    // Reset form
+  const handleFormClose = () => {
+    setShowForm(false);
+    setEditingAccount(null);
     setName('');
     setType('Banco');
     setBalance('');
     setIncludeInTax(true);
-    setShowForm(false);
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!name || !balance) return;
+
+    const accData = {
+      name,
+      type,
+      balance: parseFloat(balance),
+      includeInTax
+    };
+
+    if (editingAccount) {
+      updateAccount({ ...accData, id: editingAccount.id });
+      addToast(`Conta "${name}" atualizada com sucesso!`, 'success');
+    } else {
+      addAccount(accData);
+      addToast(`Conta "${name}" cadastrada com sucesso!`, 'success');
+    }
+
+    handleFormClose();
+  };
+
+  const handleDeleteConfirm = () => {
+    if (confirmDeleteAccount) {
+      deleteAccount(confirmDeleteAccount.id);
+      addToast(`Conta "${confirmDeleteAccount.name}" excluída com sucesso!`, 'success');
+      setConfirmDeleteAccount(null);
+    }
   };
 
   return (
@@ -38,7 +72,13 @@ const AccountManager = () => {
           <h1>Contas & Carteiras</h1>
           <p>Gerencie seus saldos bancários, corretoras e dinheiro físico.</p>
         </div>
-        <button className="btn btn-primary flex-center" onClick={() => setShowForm(!showForm)}>
+        <button className="btn btn-primary flex-center" onClick={() => {
+          if (showForm) {
+            handleFormClose();
+          } else {
+            setShowForm(true);
+          }
+        }}>
           <Plus size={18} style={{ marginRight: 6 }} />
           {showForm ? 'Fechar Form' : 'Nova Conta'}
         </button>
@@ -46,7 +86,7 @@ const AccountManager = () => {
 
       {showForm && (
         <form onSubmit={handleSubmit} className="card form-card animate-slide-down">
-          <h3>Cadastrar Nova Conta</h3>
+          <h3>{editingAccount ? 'Editar Conta' : 'Cadastrar Nova Conta'}</h3>
           <div className="form-grid">
             <div className="form-group">
               <label htmlFor="acc-name">Nome da Instituição/Carteira</label>
@@ -98,17 +138,33 @@ const AccountManager = () => {
             </div>
           </div>
           <div className="form-actions">
-            <button type="submit" className="btn btn-primary">Salvar Conta</button>
-            <button type="button" className="btn btn-ghost" onClick={() => setShowForm(false)}>Cancelar</button>
+            <button type="submit" className="btn btn-primary">{editingAccount ? 'Salvar Alterações' : 'Salvar Conta'}</button>
+            <button type="button" className="btn btn-ghost" onClick={handleFormClose}>Cancelar</button>
           </div>
         </form>
       )}
 
       <div className="accounts-list-grid">
         {accounts.map(acc => (
-          <AccountCard key={acc.id} acc={acc} onDelete={deleteAccount} />
+          <AccountCard 
+            key={acc.id} 
+            acc={acc} 
+            onDeleteRequest={setConfirmDeleteAccount} 
+            onEdit={handleEditClick} 
+          />
         ))}
       </div>
+
+      <ConfirmDialog 
+        isOpen={!!confirmDeleteAccount}
+        title="Excluir Conta"
+        message={`Tem certeza que deseja excluir a conta "${confirmDeleteAccount?.name}"? Esta ação removerá a conta permanentemente.`}
+        confirmLabel="Excluir"
+        cancelLabel="Cancelar"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setConfirmDeleteAccount(null)}
+        variant="danger"
+      />
     </div>
   );
 };
