@@ -48,6 +48,8 @@ const InvestmentAdvisor = ({ investments, onAdd, onDelete }) => {
     setYieldRate('');
     setIpcaCoverage(false);
     setShowForm(false);
+  };
+
   const [updatingPrices, setUpdatingPrices] = useState(false);
 
   const handleUpdatePrices = async () => {
