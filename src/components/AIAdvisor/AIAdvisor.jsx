@@ -32,7 +32,8 @@ const AIAdvisor = () => {
     jwtToken,
     aiHistory,
     setAiHistory,
-    addSavingsGoal
+    addSavingsGoal,
+    addTransaction
   } = useContext(FinanceContext);
 
   const { addToast } = useToast();
@@ -46,8 +47,9 @@ const AIAdvisor = () => {
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
 
-  // Tracks message indexes of goals that were already created or ignored
+  // Tracks message indexes of goals/transactions that were already created or ignored
   const [processedGoals, setProcessedGoals] = useState({});
+  const [processedTransactions, setProcessedTransactions] = useState({});
 
   const welcomeMessage = { 
     sender: 'ai', 
@@ -246,6 +248,55 @@ const AIAdvisor = () => {
     return { cleanText: text, goalData: null };
   };
 
+  const handleCreateTransaction = (idx, txData) => {
+    if (accounts.length === 0) {
+      addToast("Nenhuma conta cadastrada no sistema. Cadastre uma conta antes de lançar despesas.", "error");
+      return;
+    }
+    
+    addTransaction({
+      description: txData.description,
+      amount: parseFloat(txData.amount),
+      type: txData.type || 'expense',
+      category: txData.category || 'Outros',
+      accountId: accounts[0].id, // Default to the first account
+      date: txData.date || new Date().toISOString().split('T')[0],
+      isTaxDeductible: txData.isTaxDeductible || false
+    });
+    setProcessedTransactions(prev => ({ ...prev, [idx]: 'created' }));
+    addToast(`Lançamento "${txData.description}" cadastrado com sucesso!`, 'success');
+  };
+
+  const parseTransactionAction = (text) => {
+    const txRegex = /\[CREATE_TRANSACTION:\s*({[^}]+})\s*\]/g;
+    const match = txRegex.exec(text);
+    if (match) {
+      try {
+        const data = JSON.parse(match[1]);
+        const cleanText = text.replace(txRegex, '').trim();
+        return { cleanText, txData: data };
+      } catch (e) {
+        console.error("Failed to parse transaction action JSON:", e);
+      }
+    }
+    return { cleanText: text, txData: null };
+  };
+
+  const parsePredictiveAlert = (text) => {
+    const alertRegex = /\[PREDICTIVE_ALERT:\s*({[^}]+})\s*\]/g;
+    const match = alertRegex.exec(text);
+    if (match) {
+      try {
+        const data = JSON.parse(match[1]);
+        const cleanText = text.replace(alertRegex, '').trim();
+        return { cleanText, alertData: data };
+      } catch (e) {
+        console.error("Failed to parse predictive alert JSON:", e);
+      }
+    }
+    return { cleanText: text, alertData: null };
+  };
+
   // Quick Action Buttons
   const quickActions = [
     {
@@ -434,8 +485,25 @@ const AIAdvisor = () => {
           {/* Messages Wrapper */}
           <div className="messages-container">
             {activeMessages.map((msg, idx) => {
-              // Parse the message for goal actions
-              const { cleanText, goalData } = msg.sender === 'ai' ? parseGoalAction(msg.text) : { cleanText: msg.text, goalData: null };
+              // Parse the message for goal actions, transaction actions, and predictive alerts
+              let cleanText = msg.text;
+              let goalData = null;
+              let txData = null;
+              let alertData = null;
+              
+              if (msg.sender === 'ai') {
+                const parsedGoal = parseGoalAction(cleanText);
+                cleanText = parsedGoal.cleanText;
+                goalData = parsedGoal.goalData;
+
+                const parsedTx = parseTransactionAction(cleanText);
+                cleanText = parsedTx.cleanText;
+                txData = parsedTx.txData;
+
+                const parsedAlert = parsePredictiveAlert(cleanText);
+                cleanText = parsedAlert.cleanText;
+                alertData = parsedAlert.alertData;
+              }
               
               return (
                 <div key={idx} className={`message-row ${msg.sender === 'user' ? 'user-row' : 'ai-row'}`}>
@@ -484,6 +552,58 @@ const AIAdvisor = () => {
                                 </button>
                               </div>
                             )}
+                          </div>
+                        )}
+
+                        {/* Interactive Transaction Suggestion Card */}
+                        {txData && (
+                          <div className="ai-goal-card mt-sm border-success" style={{ borderLeftColor: 'var(--success-color)' }}>
+                            <div className="flex-center-y gap-sm text-success">
+                              <CheckCircle size={16} />
+                              <span className="font-bold text-xs text-primary">Lançamento de Despesa Sugerido</span>
+                            </div>
+                            <p className="text-xs text-secondary mt-xs">
+                              Descrição: <strong className="text-primary">{txData.description}</strong> • Valor: <strong className="text-primary">{formatBRL(txData.amount)}</strong> • Categoria: <strong className="text-primary">{txData.category}</strong>
+                            </p>
+                            
+                            {processedTransactions[idx] === 'created' ? (
+                              <div className="text-success text-xs font-semibold mt-sm flex-center-y gap-xs">
+                                <CheckCircle size={14} /> Lançamento cadastrado com sucesso!
+                              </div>
+                            ) : processedTransactions[idx] === 'ignored' ? (
+                              <div className="text-secondary text-xs italic mt-sm">
+                                Sugestão ignorada.
+                              </div>
+                            ) : (
+                              <div className="flex gap-sm mt-sm">
+                                <button 
+                                  className="btn btn-sm btn-accent" 
+                                  style={{ backgroundColor: 'var(--success-color)', color: '#0b0f19' }}
+                                  onClick={() => handleCreateTransaction(idx, txData)}
+                                >
+                                  Confirmar Lançamento
+                                </button>
+                                <button 
+                                  className="btn btn-sm btn-secondary"
+                                  onClick={() => setProcessedTransactions(prev => ({ ...prev, [idx]: 'ignored' }))}
+                                >
+                                  Ignorar
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Predictive Alert Box */}
+                        {alertData && (
+                          <div className={`ai-goal-card mt-sm ${alertData.severity === 'danger' ? 'border-danger' : 'border-warning'}`} style={{ borderLeftColor: alertData.severity === 'danger' ? 'var(--danger-color)' : 'var(--warning-color)' }}>
+                            <div className="flex-center-y gap-sm">
+                              <AlertTriangle size={16} className={alertData.severity === 'danger' ? 'text-danger' : 'text-warning'} />
+                              <span className={`font-bold text-xs ${alertData.severity === 'danger' ? 'text-danger' : 'text-warning'}`}>Alerta Preditivo da IA</span>
+                            </div>
+                            <p className="text-xs text-secondary mt-xs leading-relaxed">
+                              {alertData.message}
+                            </p>
                           </div>
                         )}
                       </div>

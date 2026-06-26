@@ -7,6 +7,12 @@ import AIDiagnosticsDrawer from '../layout/AIDiagnosticsDrawer';
 const TaxAssistant = () => {
   const { transactions, dependents, investments, jwtToken } = useContext(FinanceContext);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  
+  // States for tax audit and DARF guidance
+  const [taxDeclarationText, setTaxDeclarationText] = useState('');
+  const [uploadedFileName, setUploadedFileName] = useState('');
+  const [activePrompt, setActivePrompt] = useState('');
+  const [drawerTitle, setDrawerTitle] = useState('Diagnóstico Fiscal com IA');
 
   // 1. Get deductible transactions
   const deductibleTransactions = transactions.filter(t => t.isTaxDeductible && t.type === 'expense');
@@ -26,6 +32,54 @@ const TaxAssistant = () => {
   }), [deductibleTransactions, dependents]);
 
   const taxPrompt = "Faça uma análise rigorosa do meu cenário de deduções fiscais atuais. Verifique se o total deduzido compensa fazer a Declaração Completa do IRPF frente ao Desconto Simplificado (limite de R$ 16.754,34). Comente sobre despesas com saúde, educação, previdência privada (PGBL) e dependentes. Mantenha um tom profissional e didático de contador sênior, apresentando sugestões em listas ou tabelas.";
+
+  const handleTaxDeclarationUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadedFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      // Read XML/TXT/PDF metadata or string representation
+      setTaxDeclarationText(event.target.result.substring(0, 45000));
+    };
+    reader.readAsText(file);
+  };
+
+  const handleAuditClick = () => {
+    if (!taxDeclarationText) return;
+    setDrawerTitle("Auditoria Patrimonial com IA");
+    setActivePrompt(`Compare a minha declaração de IRPF do ano anterior (cujo XML/texto segue em anexo) com o meu contexto de contas e investimentos deste ano.
+    
+    Declaração do Ano Anterior:
+    ---
+    ${taxDeclarationText}
+    ---
+    
+    Por favor, aponte inconsistências como:
+    1. Bens ou ativos declarados anteriormente que sumiram da carteira atual (verifique se há registro de venda).
+    2. Ativos comprados neste ano que não constavam antes.
+    3. Diferenças na evolução patrimonial declarada.
+    Dê recomendações contábeis claras estruturadas.`);
+    setIsDrawerOpen(true);
+  };
+
+  const handleDarfClick = () => {
+    setDrawerTitle("Guia de Emissão de DARF");
+    setActivePrompt(`Gere um guia passo a passo completo e detalhado para emissão de DARF no Sicalc da Receita Federal.
+    Volume de vendas de ações no mês atual: ${formatBRL(monthlySalesValue)}.
+    Considere as seguintes regras:
+    - Vendas de ações até R$ 20.000 no mês são isentas. Acima disso, alíquota de 15% sobre o lucro líquido (preencher código 6015).
+    - Vendas de Fundos Imobiliários (FII) não têm isenção, a alíquota é de 20% sobre o lucro (preencher código 6015).
+    - Explique como calcular o lucro (Preço de Venda menos Preço Médio de Compra), como compensar prejuízos passados e como emitir a guia para pagamento até o último dia útil do mês seguinte.`);
+    setIsDrawerOpen(true);
+  };
+
+  const handleGeneralDiagnosticsClick = () => {
+    setDrawerTitle("Diagnóstico Fiscal com IA");
+    setActivePrompt(taxPrompt);
+    setIsDrawerOpen(true);
+  };
 
 
   // Breakdown by category (Health vs Education)
@@ -66,7 +120,7 @@ const TaxAssistant = () => {
           <h1>Assistente Fiscal & IRPF</h1>
           <p>Acompanhe suas despesas dedutíveis em tempo real e prepare-se para a declaração anual.</p>
         </div>
-        <button className="ai-diagnostics-float-btn" onClick={() => setIsDrawerOpen(true)}>
+        <button className="ai-diagnostics-float-btn" onClick={handleGeneralDiagnosticsClick}>
           <Sparkles size={16} />
           Diagnóstico de IA
         </button>
@@ -184,6 +238,54 @@ const TaxAssistant = () => {
             )}
           </div>
 
+          {/* IRPF Anterior & DARF Calculator */}
+          <div className="card details-card">
+            <h3>Auditoria e Guias de Impostos (IA)</h3>
+            <p className="card-subtext mb-md">Importe sua declaração passada para auditar inconsistências patrimoniais ou emita guias de DARF.</p>
+            
+            <div className="flex-column gap-sm">
+              {/* DARF Trigger Button */}
+              <button 
+                className="btn btn-secondary flex-center-y gap-xs w-full"
+                onClick={handleDarfClick}
+                style={{ justifyContent: 'center' }}
+              >
+                <Calculator size={16} />
+                Instruções de Emissão de DARF
+              </button>
+
+              <div style={{ borderTop: '1px solid var(--border-color)', margin: '10px 0' }} />
+
+              {/* Upload Tax Return XML/PDF */}
+              <div className="flex-column gap-xs">
+                <span className="text-xs text-secondary font-medium">Auditar com Declaração Anterior:</span>
+                <div className="flex gap-sm">
+                  <input 
+                    type="file" 
+                    id="past-tax-return-input"
+                    style={{ display: 'none' }}
+                    onChange={handleTaxDeclarationUpload}
+                    accept=".xml,.txt"
+                  />
+                  <button 
+                    className="btn btn-secondary text-xs flex-grow"
+                    onClick={() => document.getElementById('past-tax-return-input').click()}
+                  >
+                    {uploadedFileName ? `${uploadedFileName.substring(0, 15)}...` : 'Declaração (.xml / .txt)'}
+                  </button>
+                  <button 
+                    className="btn btn-accent text-xs flex-center-y gap-xs"
+                    disabled={!taxDeclarationText}
+                    onClick={handleAuditClick}
+                  >
+                    <Sparkles size={12} />
+                    Auditar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Deductible Transactions List */}
           <div className="card details-card flex-grow">
             <h3>Recibos e Transações Dedutíveis</h3>
@@ -218,8 +320,8 @@ const TaxAssistant = () => {
       <AIDiagnosticsDrawer
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
-        title="Diagnóstico Fiscal com IA"
-        systemPrompt={taxPrompt}
+        title={drawerTitle}
+        systemPrompt={activePrompt}
         contextSummary={contextSummary}
         jwtToken={jwtToken}
       />
