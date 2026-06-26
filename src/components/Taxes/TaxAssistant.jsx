@@ -211,6 +211,7 @@ const TaxAssistant = () => {
                 <p className="empty-state text-sm text-secondary italic">Nenhuma despesa dedutível registrada.</p>
               )}
             </div>
+          </div>
         </div>
       </div>
 
