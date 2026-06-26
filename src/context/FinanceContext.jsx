@@ -8,7 +8,7 @@ import {
   deriveAuthKey,
   hashAuthKey 
 } from '../utils/cryptoUtils';
-import { saveEncryptedFile } from '../utils/indexedDbUtils';
+import { saveEncryptedFile, clearAllDocuments } from '../utils/indexedDbUtils';
 
 // Configurable backend URL — set VITE_API_URL in .env for production deploys
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -471,6 +471,60 @@ export const FinanceProvider = ({ children }) => {
     setAiHistory([]);
   }, []);
 
+  const resetWallet = useCallback(async () => {
+    try {
+      await clearAllDocuments();
+    } catch (e) {
+      console.error("Failed to clear receipt files from IndexedDB:", e);
+    }
+
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('wealth_mgr_')) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+
+    setSessionKey(null);
+    setUsername('');
+    setJwtToken(null);
+    setSyncStatus('local_only');
+    setIsLocked(true);
+    setIsInitialized(false);
+
+    setAccounts([]);
+    setDependents([]);
+    setTransactions([]);
+    setReminders([]);
+    setInvestments([]);
+    setDocuments([]);
+    setProfile('');
+    setInvestmentGoal({ target: 0, current: 0, label: 'Reserva de Emergência' });
+    setBudgets([]);
+    setSettings({ autoLockMinutes: 5, theme: 'dark' });
+    setSavingsGoals([]);
+    setCustomCategories({ income: [], expense: [] });
+    setRecurringTemplates([]);
+    setWealthHistory([]);
+    setAiHistory([]);
+  }, []);
+
+  const recoverWalletFromBackup = useCallback(async (backupData, newPassword) => {
+    try {
+      const success = await setupMasterPassword(newPassword);
+      if (!success) {
+        throw new Error("Failed to setup new master password");
+      }
+      await applyVaultData(backupData);
+      return true;
+    } catch (error) {
+      console.error("Error recovering wallet from backup:", error);
+      return false;
+    }
+  }, [setupMasterPassword, applyVaultData]);
+
   const registerCloud = useCallback(async (user, password) => {
     try {
       let saltBase64 = getRawStorageItem('wealth_mgr_security_salt');
@@ -856,6 +910,8 @@ export const FinanceProvider = ({ children }) => {
       setupMasterPassword,
       unlockWallet,
       lockWallet,
+      resetWallet,
+      recoverWalletFromBackup,
       addAccount,
       deleteAccount,
       updateAccount,
