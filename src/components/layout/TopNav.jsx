@@ -11,10 +11,12 @@ import {
   CloudLightning, 
   CloudOff, 
   RefreshCw, 
-  Loader2 
+  Loader2,
+  Menu,
+  TrendingUp
 } from 'lucide-react';
 
-const TopNav = () => {
+const TopNav = ({ onToggleSidebar }) => {
   const { 
     accounts, 
     investments, 
@@ -143,6 +145,17 @@ const TopNav = () => {
   return (
     <>
       <header className="topnav">
+        {/* Hamburger Menu Button for mobile/tablet drawer */}
+        <button className="hamburger-btn" onClick={onToggleSidebar} aria-label="Abrir menu">
+          <Menu size={22} />
+        </button>
+
+        {/* Brand/logo shown only on mobile/tablet top bar */}
+        <div className="mobile-brand">
+          <TrendingUp className="logo-icon text-accent" size={22} />
+          <span className="logo-text">Wealth Manager</span>
+        </div>
+
         <div className="topnav-stats">
           <div className="stat-pill">
             <div className="stat-pill-icon net-worth">

@@ -22,6 +22,13 @@ const AIAdvisor = lazy(() => import('./components/AIAdvisor/AIAdvisor'));
 function MainContent() {
   const { isLocked, isInitialized, setupMasterPassword, unlockWallet, lockWallet, settings, syncWithCloud } = useContext(FinanceContext);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Close sidebar drawer when changing active tab on mobile/tablet
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    setIsSidebarOpen(false);
+  };
 
   useEffect(() => {
     const theme = settings?.theme || 'dark';
@@ -61,7 +68,7 @@ function MainContent() {
   const renderActiveTab = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard setActiveTab={setActiveTab} />;
+        return <Dashboard setActiveTab={handleTabChange} />;
       case 'accounts':
         return <Accounts />;
       case 'transactions':
@@ -85,7 +92,7 @@ function MainContent() {
       case 'settings':
         return <SettingsManager />;
       default:
-        return <Dashboard setActiveTab={setActiveTab} />;
+        return <Dashboard setActiveTab={handleTabChange} />;
     }
   };
 
@@ -102,9 +109,21 @@ function MainContent() {
 
   return (
     <div className="app-layout">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+      {/* Backdrop overlay for mobile drawer menu */}
+      <div 
+        className={`sidebar-backdrop ${isSidebarOpen ? 'active' : ''}`} 
+        onClick={() => setIsSidebarOpen(false)} 
+      />
+      
+      <Sidebar 
+        activeTab={activeTab} 
+        setActiveTab={handleTabChange} 
+        isOpen={isSidebarOpen} 
+        onClose={() => setIsSidebarOpen(false)} 
+      />
+      
       <div className="main-content-wrapper">
-        <TopNav />
+        <TopNav onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
         <main className="content-container">
           <Suspense fallback={
             <div className="flex-center flex-column" style={{ height: '50vh', gap: 16 }}>

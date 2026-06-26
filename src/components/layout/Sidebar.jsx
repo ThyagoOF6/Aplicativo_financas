@@ -11,10 +11,11 @@ import {
   BarChart3,
   Settings,
   Target,
-  Sparkles
+  Sparkles,
+  X
 } from 'lucide-react';
 
-const Sidebar = ({ activeTab, setActiveTab }) => {
+const Sidebar = ({ activeTab, setActiveTab, isOpen, onClose }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'accounts', label: 'Contas & Carteiras', icon: Wallet },
@@ -33,10 +34,13 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
 
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
       <div className="sidebar-logo">
         <TrendingUp className="logo-icon" size={28} />
         <span className="logo-text">Wealth Manager</span>
+        <button className="sidebar-close-btn" onClick={onClose} aria-label="Fechar menu">
+          <X size={20} />
+        </button>
       </div>
       
       <nav className="sidebar-nav">
