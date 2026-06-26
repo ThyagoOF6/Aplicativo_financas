@@ -1,0 +1,602 @@
+/* Stylesheet for enhanced AI Tax Planner and IRPF Simulator */
+
+.taxes-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  animation: fadeIn 0.4s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Tabs Navigation Styling */
+.taxes-tabs-nav {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+}
+
+.taxes-tabs-nav .tab-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 20px;
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: var(--transition-smooth);
+}
+
+.taxes-tabs-nav .tab-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.taxes-tabs-nav .tab-btn.active {
+  color: var(--accent-color);
+  background: var(--accent-glow);
+  box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.2);
+}
+
+/* Split Grid for General and Simulator tabs */
+.taxes-split-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 1024px) {
+  .taxes-split-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Interactive Simulator Layout */
+.simulator-layout {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 1024px) {
+  .simulator-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Form Inputs Grid */
+.sim-form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sim-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sim-input-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sim-input-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sim-input-desc {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: -2px;
+}
+
+.sim-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.sim-input-prefix {
+  position: absolute;
+  left: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.sim-input-field {
+  width: 100%;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  padding: 10px 12px 10px 40px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  transition: var(--transition-smooth);
+}
+
+.sim-input-field:focus {
+  border-color: var(--accent-color);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+/* Range Sliders */
+.sim-slider-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.sim-range-slider {
+  flex-grow: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  outline: none;
+}
+
+.sim-range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent-color);
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  box-shadow: 0 0 8px var(--accent-color);
+}
+
+.sim-range-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.slider-pct-indicator {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  min-width: 45px;
+  text-align: right;
+}
+
+/* AI Question Box Card */
+.question-box-card {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.6) 0%, rgba(15, 23, 42, 0.8) 100%);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-backdrop);
+}
+
+.question-box-card h4 {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.textarea-question-wrapper {
+  position: relative;
+  margin-top: 12px;
+}
+
+.textarea-question {
+  width: 100%;
+  min-height: 80px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  padding: 12px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+  transition: var(--transition-smooth);
+}
+
+.textarea-question:focus {
+  border-color: var(--accent-color);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+/* Simulation Results / Comparison Layout */
+.comparison-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.comparison-cards-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 480px) {
+  .comparison-cards-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.comparison-card {
+  background: rgba(30, 41, 59, 0.3);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 16px;
+  transition: var(--transition-smooth);
+  position: relative;
+  overflow: hidden;
+}
+
+.comparison-card.highlighted {
+  border-color: var(--success-color);
+  background: rgba(16, 185, 129, 0.03);
+  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.05);
+}
+
+.comparison-card.highlighted::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background-color: var(--success-color);
+}
+
+.comp-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 12px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.comp-badge-standard {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-secondary);
+}
+
+.comp-badge-recommended {
+  background: var(--success-bg);
+  color: var(--success-color);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.1);
+}
+
+.comp-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.comp-values {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.comp-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.comp-row-highlight {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  border-top: 1px dashed var(--border-color);
+  padding-top: 8px;
+  margin-top: 4px;
+}
+
+.comp-result-tax {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.comp-tax-val {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.comparison-card.highlighted .comp-tax-val {
+  color: var(--success-color);
+}
+
+/* Optimization and Savings Banners */
+.savings-banner {
+  background: linear-gradient(90deg, rgba(16, 185, 129, 0.15) 0%, rgba(30, 41, 59, 0.5) 100%);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: var(--border-radius);
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.savings-icon-wrapper {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--success-color);
+  color: #0b0f19;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+}
+
+.savings-content h4 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.savings-content p {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.pgbl-optimization-card {
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.1) 0%, rgba(30, 41, 59, 0.4) 100%);
+  border: 1px dashed rgba(56, 189, 248, 0.3);
+  border-radius: var(--border-radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pgbl-opt-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pgbl-opt-body p {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.pgbl-opt-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: var(--border-radius-sm);
+  padding: 10px;
+}
+
+.pgbl-stat-box {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pgbl-stat-label {
+  font-size: 10px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.pgbl-stat-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent-color);
+}
+
+/* Timeline Layout for Fiscal Calendar */
+.fiscal-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  position: relative;
+  padding-left: 24px;
+  margin-top: 12px;
+}
+
+.fiscal-timeline::before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  background: var(--border-color);
+}
+
+.timeline-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.timeline-dot {
+  position: absolute;
+  left: -24px;
+  top: 5px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--bg-color);
+  border: 3px solid var(--border-color);
+  z-index: 2;
+  transition: var(--transition-smooth);
+}
+
+.timeline-item.active .timeline-dot {
+  border-color: var(--accent-color);
+  background: var(--accent-color);
+  box-shadow: 0 0 8px var(--accent-color);
+}
+
+.timeline-item.warning .timeline-dot {
+  border-color: var(--warning-color);
+  background: var(--warning-color);
+  box-shadow: 0 0 8px var(--warning-color);
+}
+
+.timeline-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.timeline-date {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.timeline-item.active .timeline-date {
+  color: var(--accent-color);
+}
+
+.timeline-item.warning .timeline-date {
+  color: var(--warning-color);
+}
+
+.timeline-period-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+}
+
+.timeline-body {
+  background: rgba(30, 41, 59, 0.3);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 14px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  transition: var(--transition-smooth);
+}
+
+.timeline-body:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(30, 41, 59, 0.45);
+}
+
+.timeline-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.timeline-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.timeline-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.timeline-btn-add {
+  background: var(--surface-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  transition: var(--transition-smooth);
+}
+
+.timeline-btn-add:hover {
+  background: var(--accent-color);
+  color: #0b0f19;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+
+.timeline-btn-add:disabled {
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-secondary);
+  border-color: transparent;
+  cursor: not-allowed;
+}
+
+.timeline-btn-add.added {
+  background: var(--success-bg);
+  color: var(--success-color);
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+/* Deductibles styling enhancements */
+.deductible-breakdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.breakdown-item {
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: var(--border-radius-sm);
+  padding: 10px 14px;
+  transition: var(--transition-smooth);
+}
+
+.breakdown-item:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.icon-circle.health-color {
+  background-color: rgba(239, 68, 68, 0.08);
+}
+
+.icon-circle.edu-color {
+  background-color: rgba(56, 189, 248, 0.08);
+}
