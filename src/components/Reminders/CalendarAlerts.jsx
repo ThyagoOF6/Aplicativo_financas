@@ -51,9 +51,9 @@ const CalendarAlerts = () => {
     });
   }, [reminders, sortBy]);
 
-  // Calendar active month/year (Defaults to June 2026 for consistency with mock data)
-  const [currentYear, setCurrentYear] = useState(2026);
-  const [currentMonth, setCurrentMonth] = useState(5); // June (0-indexed)
+  // Calendar active month/year — initialised to the real current date
+  const [currentYear, setCurrentYear] = useState(() => new Date().getFullYear());
+  const [currentMonth, setCurrentMonth] = useState(() => new Date().getMonth());
 
   // Popover details for clicked day
   const [selectedDayDate, setSelectedDayDate] = useState(null);

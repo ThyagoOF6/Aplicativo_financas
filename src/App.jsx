@@ -19,7 +19,7 @@ const SettingsManager = lazy(() => import('./components/layout/SettingsManager')
 const SavingsGoals = lazy(() => import('./components/Goals'));
 
 function MainContent() {
-  const { isLocked, isInitialized, setupMasterPassword, unlockWallet, lockWallet, settings } = useContext(FinanceContext);
+  const { isLocked, isInitialized, setupMasterPassword, unlockWallet, lockWallet, settings, syncWithCloud } = useContext(FinanceContext);
   const [activeTab, setActiveTab] = useState('dashboard');
 
   useEffect(() => {
@@ -35,7 +35,9 @@ function MainContent() {
 
     const resetTimer = () => {
       if (timeoutId) clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
+      timeoutId = setTimeout(async () => {
+        // Perform a final cloud sync before locking to prevent data loss in the 5s debounce window
+        await syncWithCloud();
         lockWallet();
       }, INACTIVITY_TIME);
     };
@@ -53,7 +55,7 @@ function MainContent() {
         window.removeEventListener(event, resetTimer);
       });
     };
-  }, [isLocked, lockWallet, settings?.autoLockMinutes]);
+  }, [isLocked, lockWallet, settings?.autoLockMinutes, syncWithCloud]);
 
   const renderActiveTab = () => {
     switch (activeTab) {

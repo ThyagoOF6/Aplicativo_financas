@@ -1,7 +1,8 @@
 import React, { useContext, useState, useMemo } from 'react';
 import { FinanceContext } from '../../context/FinanceContext';
-import { LineChart, BarChart3, PieChart, Sparkles, TrendingUp, Info } from 'lucide-react';
+import { LineChart, BarChart3, PieChart, Sparkles, TrendingUp, Info, Download, Printer } from 'lucide-react';
 import { formatBRL } from '../../utils/financeUtils';
+import { exportToCSV, exportToPrintHTML } from '../../utils/exportUtils';
 
 const ReportGenerator = () => {
   const { transactions, accounts, investments } = useContext(FinanceContext);
@@ -112,17 +113,38 @@ const ReportGenerator = () => {
           <p>Visualize a evolução do seu patrimônio e a distribuição detalhada do seu fluxo financeiro.</p>
         </div>
 
-        <div className="period-selector flex-center-y">
-          {['mensal', 'trimestral', 'semestral', 'anual'].map(p => (
-            <button
-              key={p}
-              className={`btn btn-sm select-btn ${period === p ? 'active' : 'btn-secondary'}`}
-              onClick={() => setPeriod(p)}
-              style={{ textTransform: 'capitalize' }}
+        <div className="flex-center-y gap-md">
+          <div className="period-selector flex-center-y">
+            {['mensal', 'trimestral', 'semestral', 'anual'].map(p => (
+              <button
+                key={p}
+                className={`btn btn-sm select-btn ${period === p ? 'active' : 'btn-secondary'}`}
+                onClick={() => setPeriod(p)}
+                style={{ textTransform: 'capitalize' }}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+
+          <div className="export-actions flex-center-y gap-sm">
+            <button 
+              className="btn btn-sm btn-secondary flex-center-y gap-xs"
+              onClick={() => exportToCSV(periodTx, accounts, `extrato_${period}`)}
+              title="Exportar como CSV"
             >
-              {p}
+              <Download size={15} />
+              <span>CSV</span>
             </button>
-          ))}
+            <button 
+              className="btn btn-sm btn-secondary flex-center-y gap-xs"
+              onClick={() => exportToPrintHTML(periodTx, accounts, period.toUpperCase())}
+              title="Imprimir / PDF"
+            >
+              <Printer size={15} />
+              <span>Imprimir</span>
+            </button>
+          </div>
         </div>
       </div>
 

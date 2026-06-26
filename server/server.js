@@ -97,7 +97,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     const token = jwt.sign(
       { id: userId, username: username.trim() },
       JWT_SECRET,
-      { expiresIn: '2h' }
+      { expiresIn: '12h' }
     );
 
     res.status(201).json({ success: true, token, userId });
@@ -132,7 +132,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     const token = jwt.sign(
       { id: user.id, username: user.username },
       JWT_SECRET,
-      { expiresIn: '2h' }
+      { expiresIn: '12h' }
     );
 
     res.json({ success: true, token, username: user.username });
@@ -175,6 +175,21 @@ app.post('/api/vault/sync', authenticate, async (req, res) => {
   } catch (err) {
     console.error('Vault sync error:', err);
     res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// 6. Refresh JWT token (client calls this when token has < 1h left)
+app.post('/api/auth/refresh', authenticate, (req, res) => {
+  try {
+    const newToken = jwt.sign(
+      { id: req.user.id, username: req.user.username },
+      JWT_SECRET,
+      { expiresIn: '12h' }
+    );
+    res.json({ success: true, token: newToken });
+  } catch (err) {
+    console.error('Token refresh error:', err);
+    res.status(500).json({ error: 'Failed to refresh token' });
   }
 });
 

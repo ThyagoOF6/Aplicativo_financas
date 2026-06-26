@@ -10,6 +10,66 @@ import {
 } from '../utils/cryptoUtils';
 import { saveEncryptedFile } from '../utils/indexedDbUtils';
 
+// Configurable backend URL — set VITE_API_URL in .env for production deploys
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
+// Utility to calculate JWT remaining validity time
+const getTokenRemainingTime = (token) => {
+  try {
+    const payloadStr = token.split('.')[1];
+    const payload = JSON.parse(atob(payloadStr));
+    const expTimeMs = payload.exp * 1000;
+    return expTimeMs - Date.now();
+  } catch (e) {
+    return 0;
+  }
+};
+
+// Generates due recurring transactions at unlock time (pure function, no React deps)
+const generateDueRecurringTransactions = (templates, existingTransactions) => {
+  const now = new Date();
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const newTransactions = [];
+  const updatedTemplates = [];
+
+  for (const template of templates) {
+    const startDate = new Date(template.startDate + 'T12:00:00');
+    const startMonth = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}`;
+    let shouldGenerate = false;
+
+    if (template.frequency === 'monthly' && currentMonth >= startMonth) {
+      if (template.lastGenerated !== currentMonth) shouldGenerate = true;
+    } else if (template.frequency === 'yearly') {
+      const currentYear = now.getFullYear();
+      if (now.getMonth() === startDate.getMonth() && currentYear >= startDate.getFullYear()) {
+        const lastGenYear = template.lastGenerated ? parseInt(template.lastGenerated.split('-')[0]) : 0;
+        if (lastGenYear < currentYear) shouldGenerate = true;
+      }
+    }
+
+    if (shouldGenerate) {
+      const day = String(startDate.getDate()).padStart(2, '0');
+      newTransactions.push({
+        id: crypto.randomUUID(),
+        description: template.description,
+        amount: template.amount,
+        type: template.type,
+        category: template.category,
+        accountId: template.accountId,
+        date: `${currentMonth}-${day}`,
+        dependentId: template.dependentId || '',
+        isTaxDeductible: template.isTaxDeductible || false,
+        specificPurpose: template.specificPurpose || '',
+        fromRecurring: template.id,
+      });
+      updatedTemplates.push({ ...template, lastGenerated: currentMonth });
+    } else {
+      updatedTemplates.push(template);
+    }
+  }
+  return { newTransactions, updatedTemplates };
+};
+
 export const FinanceContext = createContext();
 
 export const FinanceProvider = ({ children }) => {
@@ -36,95 +96,37 @@ export const FinanceProvider = ({ children }) => {
   const [budgets, setBudgets] = useState([]);
   const [settings, setSettings] = useState({ autoLockMinutes: 5, theme: 'dark' });
   const [savingsGoals, setSavingsGoals] = useState([]);
+  const [customCategories, setCustomCategories] = useState({ income: [], expense: [] });
+  const [recurringTemplates, setRecurringTemplates] = useState([]);
+  const [wealthHistory, setWealthHistory] = useState([]);
 
-  // Sync to raw storage (only when unlocked and key exists)
+  // Single consolidated effect: syncs all states to encrypted local storage.
+  // Replaces 11 individual effects to avoid redundant concurrent crypto operations.
   useEffect(() => {
     if (!isLocked && sessionKey) {
-      encryptData(JSON.stringify(accounts), sessionKey).then(enc => {
-        setRawStorageItem('wealth_mgr_accounts', enc);
+      const stateMap = [
+        { key: 'wealth_mgr_accounts',            value: accounts },
+        { key: 'wealth_mgr_dependents',           value: dependents },
+        { key: 'wealth_mgr_transactions',         value: transactions },
+        { key: 'wealth_mgr_reminders',            value: reminders },
+        { key: 'wealth_mgr_investments',          value: investments },
+        { key: 'wealth_mgr_documents',            value: documents },
+        { key: 'wealth_mgr_profile',              value: profile },
+        { key: 'wealth_mgr_investment_goal',      value: investmentGoal },
+        { key: 'wealth_mgr_budgets',              value: budgets },
+        { key: 'wealth_mgr_settings',             value: settings },
+        { key: 'wealth_mgr_savings_goals',        value: savingsGoals },
+        { key: 'wealth_mgr_custom_categories',    value: customCategories },
+        { key: 'wealth_mgr_recurring_templates',  value: recurringTemplates },
+        { key: 'wealth_mgr_wealth_history',       value: wealthHistory },
+      ];
+      stateMap.forEach(({ key, value }) => {
+        encryptData(JSON.stringify(value), sessionKey).then(enc => {
+          setRawStorageItem(key, enc);
+        });
       });
     }
-  }, [accounts, isLocked, sessionKey]);
-
-  useEffect(() => {
-    if (!isLocked && sessionKey) {
-      encryptData(JSON.stringify(dependents), sessionKey).then(enc => {
-        setRawStorageItem('wealth_mgr_dependents', enc);
-      });
-    }
-  }, [dependents, isLocked, sessionKey]);
-
-  useEffect(() => {
-    if (!isLocked && sessionKey) {
-      encryptData(JSON.stringify(transactions), sessionKey).then(enc => {
-        setRawStorageItem('wealth_mgr_transactions', enc);
-      });
-    }
-  }, [transactions, isLocked, sessionKey]);
-
-  useEffect(() => {
-    if (!isLocked && sessionKey) {
-      encryptData(JSON.stringify(reminders), sessionKey).then(enc => {
-        setRawStorageItem('wealth_mgr_reminders', enc);
-      });
-    }
-  }, [reminders, isLocked, sessionKey]);
-
-  useEffect(() => {
-    if (!isLocked && sessionKey) {
-      encryptData(JSON.stringify(investments), sessionKey).then(enc => {
-        setRawStorageItem('wealth_mgr_investments', enc);
-      });
-    }
-  }, [investments, isLocked, sessionKey]);
-
-  useEffect(() => {
-    if (!isLocked && sessionKey) {
-      encryptData(JSON.stringify(documents), sessionKey).then(enc => {
-        setRawStorageItem('wealth_mgr_documents', enc);
-      });
-    }
-  }, [documents, isLocked, sessionKey]);
-
-  useEffect(() => {
-    if (!isLocked && sessionKey) {
-      encryptData(JSON.stringify(profile), sessionKey).then(enc => {
-        setRawStorageItem('wealth_mgr_profile', enc);
-      });
-    }
-  }, [profile, isLocked, sessionKey]);
-
-  useEffect(() => {
-    if (!isLocked && sessionKey) {
-      encryptData(JSON.stringify(investmentGoal), sessionKey).then(enc => {
-        setRawStorageItem('wealth_mgr_investment_goal', enc);
-      });
-    }
-  }, [investmentGoal, isLocked, sessionKey]);
-
-  useEffect(() => {
-    if (!isLocked && sessionKey) {
-      encryptData(JSON.stringify(budgets), sessionKey).then(enc => {
-        setRawStorageItem('wealth_mgr_budgets', enc);
-      });
-    }
-  }, [budgets, isLocked, sessionKey]);
-
-  useEffect(() => {
-    if (!isLocked && sessionKey) {
-      encryptData(JSON.stringify(settings), sessionKey).then(enc => {
-        setRawStorageItem('wealth_mgr_settings', enc);
-      });
-    }
-  }, [settings, isLocked, sessionKey]);
-
-  useEffect(() => {
-    if (!isLocked && sessionKey) {
-      encryptData(JSON.stringify(savingsGoals), sessionKey).then(enc => {
-        setRawStorageItem('wealth_mgr_savings_goals', enc);
-      });
-    }
-  }, [savingsGoals, isLocked, sessionKey]);
+  }, [accounts, dependents, transactions, reminders, investments, documents, profile, investmentGoal, budgets, settings, savingsGoals, customCategories, recurringTemplates, wealthHistory, isLocked, sessionKey]);
 
   // Document migration from metadata to IndexedDB
   const migrateDocsFromMetadata = async (parsedDocs, cryptoKey) => {
@@ -148,6 +150,33 @@ export const FinanceProvider = ({ children }) => {
     return parsedDocs;
   };
 
+  // Applies a parsed vault object to all local React states.
+  // Centralises what was previously duplicated in unlockWallet, loginCloud and restoreFullBackup.
+  // cryptoKey is optional and only needed for encrypted document migration.
+  const applyVaultData = useCallback(async (parsed, cryptoKey = null) => {
+    if (parsed.accounts) setAccounts(parsed.accounts);
+    if (parsed.dependents) setDependents(parsed.dependents);
+    if (parsed.transactions) setTransactions(parsed.transactions);
+    if (parsed.reminders) setReminders(parsed.reminders);
+    if (parsed.investments) setInvestments(parsed.investments);
+    if (parsed.documents) {
+      if (cryptoKey) {
+        const cleanedDocs = await migrateDocsFromMetadata(parsed.documents, cryptoKey);
+        setDocuments(cleanedDocs);
+      } else {
+        setDocuments(parsed.documents);
+      }
+    }
+    if (parsed.profile !== undefined) setProfile(parsed.profile);
+    if (parsed.investmentGoal) setInvestmentGoal(parsed.investmentGoal);
+    if (parsed.budgets) setBudgets(parsed.budgets);
+    if (parsed.settings) setSettings(parsed.settings);
+    if (parsed.savingsGoals) setSavingsGoals(parsed.savingsGoals);
+    if (parsed.customCategories) setCustomCategories(parsed.customCategories);
+    if (parsed.recurringTemplates) setRecurringTemplates(parsed.recurringTemplates);
+    if (parsed.wealthHistory) setWealthHistory(parsed.wealthHistory);
+  }, []);
+
   // Cloud sync helper function
   const syncWithCloud = useCallback(async (key = sessionKey, token = jwtToken, forceData = null) => {
     if (!token || !key) return;
@@ -155,22 +184,14 @@ export const FinanceProvider = ({ children }) => {
     setSyncStatus('syncing');
     try {
       const dataToEncrypt = forceData || {
-        accounts,
-        dependents,
-        transactions,
-        reminders,
-        investments,
-        documents,
-        profile,
-        investmentGoal,
-        budgets,
-        settings,
-        savingsGoals
+        accounts, dependents, transactions, reminders, investments, documents,
+        profile, investmentGoal, budgets, settings, savingsGoals,
+        customCategories, recurringTemplates, wealthHistory,
       };
       
       const ciphertext = await encryptData(JSON.stringify(dataToEncrypt), key);
       
-      const res = await fetch('http://localhost:5000/api/vault/sync', {
+      const res = await fetch(`${API_BASE}/api/vault/sync`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -188,7 +209,7 @@ export const FinanceProvider = ({ children }) => {
       console.error("Cloud sync error:", err);
       setSyncStatus('error');
     }
-  }, [accounts, dependents, transactions, reminders, investments, documents, profile, investmentGoal, savingsGoals, sessionKey, jwtToken]);
+  }, [accounts, dependents, transactions, reminders, investments, documents, profile, investmentGoal, savingsGoals, customCategories, recurringTemplates, wealthHistory, sessionKey, jwtToken]);
 
   // Debounced auto sync triggers when local state changes
   useEffect(() => {
@@ -200,23 +221,66 @@ export const FinanceProvider = ({ children }) => {
     }
   }, [accounts, dependents, transactions, reminders, investments, documents, profile, investmentGoal, budgets, settings, savingsGoals, isLocked, sessionKey, jwtToken, syncWithCloud]);
 
-  // Decrypts and loads all local database states
+  // Automatically renews JWT token before expiration (Fix #6)
+  const performTokenRefresh = useCallback(async (token = jwtToken) => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setJwtToken(data.token);
+      } else {
+        console.warn("Failed to refresh JWT token");
+      }
+    } catch (err) {
+      console.error("Token refresh request error:", err);
+    }
+  }, [jwtToken]);
+
+  useEffect(() => {
+    if (jwtToken) {
+      const remaining = getTokenRemainingTime(jwtToken);
+      // Refresh when 30 minutes remain on the token
+      const refreshDelay = Math.max(1000, remaining - 30 * 60 * 1000);
+      
+      const timer = setTimeout(() => {
+        performTokenRefresh(jwtToken);
+      }, refreshDelay);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [jwtToken, performTokenRefresh]);
+
+  // Decrypts and loads all local database states.
+  // Returns the full parsed data map so callers can use it for post-load logic
+  // (wealth snapshots, recurring transaction generation) without React batching issues.
   const decryptAndLoadState = async (cryptoKey) => {
+    const parsedData = {};
     const keys = [
-      { storageKey: 'wealth_mgr_accounts', setter: setAccounts, def: [] },
-      { storageKey: 'wealth_mgr_dependents', setter: setDependents, def: [] },
-      { storageKey: 'wealth_mgr_transactions', setter: setTransactions, def: [] },
-      { storageKey: 'wealth_mgr_reminders', setter: setReminders, def: [] },
-      { storageKey: 'wealth_mgr_investments', setter: setInvestments, def: [] },
-      { storageKey: 'wealth_mgr_documents', setter: async (data) => {
+      { storageKey: 'wealth_mgr_accounts',           stateKey: 'accounts',           setter: setAccounts,           def: [] },
+      { storageKey: 'wealth_mgr_dependents',          stateKey: 'dependents',          setter: setDependents,          def: [] },
+      { storageKey: 'wealth_mgr_transactions',        stateKey: 'transactions',        setter: setTransactions,        def: [] },
+      { storageKey: 'wealth_mgr_reminders',           stateKey: 'reminders',           setter: setReminders,           def: [] },
+      { storageKey: 'wealth_mgr_investments',         stateKey: 'investments',         setter: setInvestments,         def: [] },
+      { storageKey: 'wealth_mgr_documents',           stateKey: 'documents',           setter: async (data) => {
         const cleaned = await migrateDocsFromMetadata(data, cryptoKey);
         setDocuments(cleaned);
+        parsedData.documents = cleaned;
       }, def: [] },
-      { storageKey: 'wealth_mgr_profile', setter: setProfile, def: '' },
-      { storageKey: 'wealth_mgr_investment_goal', setter: setInvestmentGoal, def: { target: 0, current: 0, label: 'Reserva de Emergência' } },
-      { storageKey: 'wealth_mgr_budgets', setter: setBudgets, def: [] },
-      { storageKey: 'wealth_mgr_settings', setter: setSettings, def: { autoLockMinutes: 5, theme: 'dark' } },
-      { storageKey: 'wealth_mgr_savings_goals', setter: setSavingsGoals, def: [] }
+      { storageKey: 'wealth_mgr_profile',             stateKey: 'profile',             setter: setProfile,             def: '' },
+      { storageKey: 'wealth_mgr_investment_goal',     stateKey: 'investmentGoal',      setter: setInvestmentGoal,      def: { target: 0, current: 0, label: 'Reserva de Emergência' } },
+      { storageKey: 'wealth_mgr_budgets',             stateKey: 'budgets',             setter: setBudgets,             def: [] },
+      { storageKey: 'wealth_mgr_settings',            stateKey: 'settings',            setter: setSettings,            def: { autoLockMinutes: 5, theme: 'dark' } },
+      { storageKey: 'wealth_mgr_savings_goals',       stateKey: 'savingsGoals',        setter: setSavingsGoals,        def: [] },
+      { storageKey: 'wealth_mgr_custom_categories',   stateKey: 'customCategories',    setter: setCustomCategories,    def: { income: [], expense: [] } },
+      { storageKey: 'wealth_mgr_recurring_templates', stateKey: 'recurringTemplates',  setter: setRecurringTemplates,  def: [] },
+      { storageKey: 'wealth_mgr_wealth_history',      stateKey: 'wealthHistory',       setter: setWealthHistory,       def: [] },
     ];
 
     for (const key of keys) {
@@ -228,16 +292,20 @@ export const FinanceProvider = ({ children }) => {
           if (key.storageKey === 'wealth_mgr_documents') {
             await key.setter(parsed);
           } else {
+            parsedData[key.stateKey] = parsed;
             key.setter(parsed);
           }
         } catch (error) {
           console.error(`Failed to decrypt state for ${key.storageKey}:`, error);
+          parsedData[key.stateKey] = key.def;
           key.setter(key.def);
         }
       } else {
+        parsedData[key.stateKey] = key.def;
         key.setter(key.def);
       }
     }
+    return parsedData;
   };
 
   // Security Operations
@@ -267,6 +335,9 @@ export const FinanceProvider = ({ children }) => {
       setBudgets([]);
       setSettings({ autoLockMinutes: 5, theme: 'dark' });
       setSavingsGoals([]);
+      setCustomCategories({ income: [], expense: [] });
+      setRecurringTemplates([]);
+      setWealthHistory([]);
       
       return true;
     } catch (error) {
@@ -284,8 +355,42 @@ export const FinanceProvider = ({ children }) => {
     const cryptoKey = await validatePassword(password, saltBase64, verificationJson);
     if (cryptoKey) {
       setSessionKey(cryptoKey);
-      await decryptAndLoadState(cryptoKey);
+      const loadedData = await decryptAndLoadState(cryptoKey);
       setIsLocked(false);
+
+      // --- Monthly Wealth Snapshot ---
+      const currentMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+      const loadedAccounts     = loadedData.accounts     || [];
+      const loadedInvestments  = loadedData.investments  || [];
+      const loadedHistory      = loadedData.wealthHistory || [];
+      if (!loadedHistory.some(s => s.month === currentMonth) &&
+          (loadedAccounts.length > 0 || loadedInvestments.length > 0)) {
+        const totalAcc = loadedAccounts.reduce((s, a) => s + a.balance, 0);
+        const totalInv = loadedInvestments.reduce((s, i) => s + i.value, 0);
+        const updatedHistory = [...loadedHistory, {
+          month: currentMonth, netWorth: totalAcc + totalInv, accounts: totalAcc, investments: totalInv
+        }].sort((a, b) => a.month.localeCompare(b.month)).slice(-24);
+        setWealthHistory(updatedHistory);
+      }
+
+      // --- Generate due Recurring Transactions ---
+      const loadedTemplates    = loadedData.recurringTemplates || [];
+      const loadedTransactions = loadedData.transactions       || [];
+      if (loadedTemplates.length > 0) {
+        const { newTransactions, updatedTemplates } = generateDueRecurringTransactions(loadedTemplates, loadedTransactions);
+        if (newTransactions.length > 0) {
+          // Update account balances without relying on React state (batching issue)
+          const updatedAccounts = loadedAccounts.map(acc => {
+            const delta = newTransactions
+              .filter(tx => tx.accountId === acc.id)
+              .reduce((s, tx) => s + (tx.type === 'income' ? tx.amount : -tx.amount), 0);
+            return delta !== 0 ? { ...acc, balance: Math.round((acc.balance + delta) * 100) / 100 } : acc;
+          });
+          setAccounts(updatedAccounts);
+          setTransactions([...newTransactions, ...loadedTransactions]);
+          setRecurringTemplates(updatedTemplates);
+        }
+      }
 
       // Cloud sync auto-init via JWT Token validation
       const savedUsername = getRawStorageItem('wealth_mgr_username');
@@ -295,7 +400,7 @@ export const FinanceProvider = ({ children }) => {
           const authHash = await hashAuthKey(authKey);
           
           // Request fresh JWT token
-          const loginRes = await fetch('http://localhost:5000/api/auth/login', {
+          const loginRes = await fetch(`${API_BASE}/api/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username: savedUsername, auth_hash: authHash })
@@ -308,7 +413,7 @@ export const FinanceProvider = ({ children }) => {
             setSyncStatus('synced');
             
             // Pull latest vault state
-            fetch(`http://localhost:5000/api/vault/get`, {
+            fetch(`${API_BASE}/api/vault/get`, {
               headers: { 'Authorization': `Bearer ${token}` }
             }).then(res => {
               if (res.ok) return res.json();
@@ -316,21 +421,7 @@ export const FinanceProvider = ({ children }) => {
               if (data && data.data_blob) {
                 const plain = await decryptData(data.data_blob, cryptoKey);
                 const parsed = JSON.parse(plain);
-                
-                if (parsed.accounts) setAccounts(parsed.accounts);
-                if (parsed.dependents) setDependents(parsed.dependents);
-                if (parsed.transactions) setTransactions(parsed.transactions);
-                if (parsed.reminders) setReminders(parsed.reminders);
-                if (parsed.investments) setInvestments(parsed.investments);
-                if (parsed.documents) {
-                  const cleanedDocs = await migrateDocsFromMetadata(parsed.documents, cryptoKey);
-                  setDocuments(cleanedDocs);
-                }
-                if (parsed.profile !== undefined) setProfile(parsed.profile);
-                if (parsed.investmentGoal) setInvestmentGoal(parsed.investmentGoal);
-                if (parsed.budgets) setBudgets(parsed.budgets);
-                if (parsed.settings) setSettings(parsed.settings);
-                if (parsed.savingsGoals) setSavingsGoals(parsed.savingsGoals);
+                await applyVaultData(parsed, cryptoKey);
               }
             }).catch(err => {
               console.warn("Could not auto-fetch vault:", err);
@@ -369,6 +460,9 @@ export const FinanceProvider = ({ children }) => {
     setBudgets([]);
     setSettings({ autoLockMinutes: 5, theme: 'dark' });
     setSavingsGoals([]);
+    setCustomCategories({ income: [], expense: [] });
+    setRecurringTemplates([]);
+    setWealthHistory([]);
   }, []);
 
   const registerCloud = useCallback(async (user, password) => {
@@ -393,7 +487,7 @@ export const FinanceProvider = ({ children }) => {
       const authKey = await deriveAuthKey(password, saltBase64);
       const authHash = await hashAuthKey(authKey);
 
-      const res = await fetch('http://localhost:5000/api/auth/register', {
+      const res = await fetch(`${API_BASE}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -417,7 +511,8 @@ export const FinanceProvider = ({ children }) => {
       setSyncStatus('synced');
 
       const dataToSync = {
-        accounts, dependents, transactions, reminders, investments, documents, profile, investmentGoal, budgets, settings, savingsGoals
+        accounts, dependents, transactions, reminders, investments, documents, profile,
+        investmentGoal, budgets, settings, savingsGoals, customCategories, recurringTemplates, wealthHistory
       };
 
       await syncWithCloud(activeKey, token, dataToSync);
@@ -426,11 +521,11 @@ export const FinanceProvider = ({ children }) => {
       console.error("Cloud registration error:", error);
       return { success: false, error: error.message };
     }
-  }, [accounts, dependents, transactions, reminders, investments, documents, profile, investmentGoal, savingsGoals, sessionKey, syncWithCloud]);
+  }, [accounts, dependents, transactions, reminders, investments, documents, profile, investmentGoal, savingsGoals, customCategories, recurringTemplates, wealthHistory, sessionKey, syncWithCloud]);
 
   const loginCloud = useCallback(async (user, password) => {
     try {
-      const saltRes = await fetch(`http://localhost:5000/api/auth/salt?username=${encodeURIComponent(user)}`);
+      const saltRes = await fetch(`${API_BASE}/api/auth/salt?username=${encodeURIComponent(user)}`);
       if (!saltRes.ok) {
         throw new Error(saltRes.status === 404 ? 'Usuário não encontrado' : 'Falha ao obter chaves');
       }
@@ -444,7 +539,7 @@ export const FinanceProvider = ({ children }) => {
       const authKey = await deriveAuthKey(password, security_salt);
       const authHash = await hashAuthKey(authKey);
 
-      const loginRes = await fetch('http://localhost:5000/api/auth/login', {
+      const loginRes = await fetch(`${API_BASE}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: user, auth_hash: authHash })
@@ -456,7 +551,7 @@ export const FinanceProvider = ({ children }) => {
 
       const { token } = await loginRes.json();
 
-      const vaultRes = await fetch('http://localhost:5000/api/vault/get', {
+      const vaultRes = await fetch(`${API_BASE}/api/vault/get`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -466,20 +561,7 @@ export const FinanceProvider = ({ children }) => {
           const plain = await decryptData(data_blob, cryptoKey);
           const parsed = JSON.parse(plain);
           
-          if (parsed.accounts) setAccounts(parsed.accounts);
-          if (parsed.dependents) setDependents(parsed.dependents);
-          if (parsed.transactions) setTransactions(parsed.transactions);
-          if (parsed.reminders) setReminders(parsed.reminders);
-          if (parsed.investments) setInvestments(parsed.investments);
-          if (parsed.documents) {
-            const cleanedDocs = await migrateDocsFromMetadata(parsed.documents, cryptoKey);
-            setDocuments(cleanedDocs);
-          }
-          if (parsed.profile !== undefined) setProfile(parsed.profile);
-          if (parsed.investmentGoal) setInvestmentGoal(parsed.investmentGoal);
-          if (parsed.budgets) setBudgets(parsed.budgets);
-          if (parsed.settings) setSettings(parsed.settings);
-          if (parsed.savingsGoals) setSavingsGoals(parsed.savingsGoals);
+          await applyVaultData(parsed, cryptoKey);
 
           // Update backups
           setRawStorageItem('wealth_mgr_accounts', await encryptData(JSON.stringify(parsed.accounts || []), cryptoKey));
@@ -682,22 +764,59 @@ export const FinanceProvider = ({ children }) => {
     setSettings(prev => ({ ...prev, ...newSettings }));
   }, []);
 
-  const restoreFullBackup = useCallback((data) => {
-    if (data.accounts) setAccounts(data.accounts);
-    if (data.dependents) setDependents(data.dependents);
-    if (data.transactions) setTransactions(data.transactions);
-    if (data.reminders) setReminders(data.reminders);
-    if (data.investments) setInvestments(data.investments);
-    if (data.documents) setDocuments(data.documents);
-    if (data.profile !== undefined) setProfile(data.profile);
-    if (data.investmentGoal) setInvestmentGoal(data.investmentGoal);
-    if (data.budgets) setBudgets(data.budgets);
-    if (data.settings) setSettings(data.settings);
-    if (data.savingsGoals) setSavingsGoals(data.savingsGoals);
-  }, []);
+  const restoreFullBackup = useCallback(async (data) => {
+    // sessionKey passed so encrypted document migration can run if needed
+    await applyVaultData(data, sessionKey);
+  }, [applyVaultData, sessionKey]);
 
   const deleteDocument = useCallback((id) => {
     setDocuments(prev => prev.filter(d => d.id !== id));
+  }, []);
+
+  // savingsGoals callbacks — defined here (not inline in JSX) for stability
+  const addSavingsGoal = useCallback((goal) => {
+    setSavingsGoals(prev => [...prev, { ...goal, id: crypto.randomUUID(), target: parseFloat(goal.target), current: parseFloat(goal.current || 0) }]);
+  }, []);
+
+  const updateSavingsGoal = useCallback((updatedGoal) => {
+    setSavingsGoals(prev => prev.map(g => g.id === updatedGoal.id ? {
+      ...updatedGoal,
+      target: parseFloat(updatedGoal.target),
+      current: parseFloat(updatedGoal.current)
+    } : g));
+  }, []);
+
+  const deleteSavingsGoal = useCallback((id) => {
+    setSavingsGoals(prev => prev.filter(g => g.id !== id));
+  }, []);
+
+  // Custom categories CRUD
+  const addCustomCategory = useCallback((type, name) => {
+    setCustomCategories(prev => ({
+      ...prev,
+      [type]: [...(prev[type] || []), { id: crypto.randomUUID(), name }]
+    }));
+  }, []);
+
+  const deleteCustomCategory = useCallback((type, id) => {
+    setCustomCategories(prev => ({
+      ...prev,
+      [type]: (prev[type] || []).filter(c => c.id !== id)
+    }));
+  }, []);
+
+  // Recurring templates CRUD
+  const addRecurringTemplate = useCallback((template) => {
+    setRecurringTemplates(prev => [...prev, {
+      ...template,
+      id: crypto.randomUUID(),
+      amount: parseFloat(template.amount),
+      lastGenerated: null
+    }]);
+  }, []);
+
+  const deleteRecurringTemplate = useCallback((id) => {
+    setRecurringTemplates(prev => prev.filter(t => t.id !== id));
   }, []);
 
   return (
@@ -716,19 +835,16 @@ export const FinanceProvider = ({ children }) => {
       investmentGoal,
       setInvestmentGoal,
       savingsGoals,
-      addSavingsGoal: useCallback((goal) => {
-        setSavingsGoals(prev => [...prev, { ...goal, id: crypto.randomUUID(), target: parseFloat(goal.target), current: parseFloat(goal.current || 0) }]);
-      }, []),
-      updateSavingsGoal: useCallback((updatedGoal) => {
-        setSavingsGoals(prev => prev.map(g => g.id === updatedGoal.id ? {
-          ...updatedGoal,
-          target: parseFloat(updatedGoal.target),
-          current: parseFloat(updatedGoal.current)
-        } : g));
-      }, []),
-      deleteSavingsGoal: useCallback((id) => {
-        setSavingsGoals(prev => prev.filter(g => g.id !== id));
-      }, []),
+      addSavingsGoal,
+      updateSavingsGoal,
+      deleteSavingsGoal,
+      customCategories,
+      addCustomCategory,
+      deleteCustomCategory,
+      recurringTemplates,
+      addRecurringTemplate,
+      deleteRecurringTemplate,
+      wealthHistory,
       setupMasterPassword,
       unlockWallet,
       lockWallet,
