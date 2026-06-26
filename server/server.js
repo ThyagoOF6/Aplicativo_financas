@@ -195,7 +195,7 @@ app.post('/api/auth/refresh', authenticate, (req, res) => {
 
 // 7. AI Advisor endpoint (interacts with Gemini API)
 app.post('/api/ai/advisor', authenticate, async (req, res) => {
-  const { question, context, history } = req.body;
+  const { question, context, history, file } = req.body;
   
   if (!question) {
     return res.status(400).json({ error: 'A pergunta (question) é obrigatória.' });
@@ -218,7 +218,8 @@ app.post('/api/ai/advisor', authenticate, async (req, res) => {
       "2. Deduções Legais de IRPF: Despesas médicas são dedutíveis integralmente. Despesas com educação têm limite anual individual. Dependentes dão abatimento na base de cálculo.\n" +
       "3. Previdência Privada: Contribuições para planos PGBL podem deduzir até 12% da renda bruta tributável do usuário na declaração completa. VGBL não deduz da base de cálculo, mas o imposto incide apenas sobre o rendimento no resgate.\n" +
       "4. Isenção em Ações: Vendas de ações na bolsa (B3) por pessoas físicas são isentas de IRPF sobre ganho de capital até R$ 20.000,00 no mês. Acima disso, alíquota de 15% (deve ser paga via DARF no mês seguinte). Vendas de FIIs não têm isenção (alíquota de 20%).\n" +
-      "5. Renda Fixa: Títulos isentos incluem LCI, LCA, CRI, CRA e Debêntures Incentivadas. Tesouro Direto, CDBs e LC têm tabela regressiva de IR (22,5% a 15% dependendo do prazo).\n\n" +
+      "5. Renda Fixa: Títulos isentos incluem LCI, LCA, CRI, CRA e Debêntures Incentivadas. Tesouro Direto, CDBs e LC têm tabela regressiva de IR (22,5% a 15% dependendo do prazo).\n" +
+      "6. Sincronização Ativa de Metas: Caso o usuário expresse explicitamente o desejo de criar uma meta de economia ou planejamento de poupança (ex: 'crie uma meta de R$ 5.000 para viagem' ou 'adicione uma meta de R$ 15.000 para notebook'), você deve orientá-lo, confirmar e adicionar OBRIGATORIAMENTE no final da sua resposta, em uma linha separada, a tag de comando estruturado exatamente neste formato: [CREATE_GOAL: {\"label\": \"Nome da Meta\", \"target\": valorNumerico, \"current\": 0}]. Não aplique formatação markdown como negrito ou blocos de código ao redor dessa tag específica.\n\n" +
       "Responda sempre em português, com tom profissional, didático, acolhedor e focado em soluções práticas. Use formatação Markdown (negritos, tabelas, listas) para facilitar a leitura. Se faltarem dados para uma recomendação exata, explique o que falta.";
 
     // Map history to Gemini content structure
@@ -247,10 +248,20 @@ app.post('/api/ai/advisor', authenticate, async (req, res) => {
       });
     }
 
-    // 3. Add current user question
+    // 3. Add current user question (inject file if available in this turn)
+    const userParts = [{ text: question }];
+    if (file && file.mimeType && file.data) {
+      userParts.unshift({
+        inlineData: {
+          mimeType: file.mimeType,
+          data: file.data
+        }
+      });
+    }
+
     contents.push({
       role: 'user',
-      parts: [{ text: question }]
+      parts: userParts
     });
 
     // Call Gemini API using native fetch

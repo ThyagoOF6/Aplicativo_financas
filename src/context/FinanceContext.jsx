@@ -99,6 +99,7 @@ export const FinanceProvider = ({ children }) => {
   const [customCategories, setCustomCategories] = useState({ income: [], expense: [] });
   const [recurringTemplates, setRecurringTemplates] = useState([]);
   const [wealthHistory, setWealthHistory] = useState([]);
+  const [aiHistory, setAiHistory] = useState([]);
 
   // Single consolidated effect: syncs all states to encrypted local storage.
   // Replaces 11 individual effects to avoid redundant concurrent crypto operations.
@@ -119,6 +120,7 @@ export const FinanceProvider = ({ children }) => {
         { key: 'wealth_mgr_custom_categories',    value: customCategories },
         { key: 'wealth_mgr_recurring_templates',  value: recurringTemplates },
         { key: 'wealth_mgr_wealth_history',       value: wealthHistory },
+        { key: 'wealth_mgr_ai_history',           value: aiHistory },
       ];
       stateMap.forEach(({ key, value }) => {
         encryptData(JSON.stringify(value), sessionKey).then(enc => {
@@ -126,7 +128,7 @@ export const FinanceProvider = ({ children }) => {
         });
       });
     }
-  }, [accounts, dependents, transactions, reminders, investments, documents, profile, investmentGoal, budgets, settings, savingsGoals, customCategories, recurringTemplates, wealthHistory, isLocked, sessionKey]);
+  }, [accounts, dependents, transactions, reminders, investments, documents, profile, investmentGoal, budgets, settings, savingsGoals, customCategories, recurringTemplates, wealthHistory, aiHistory, isLocked, sessionKey]);
 
   // Document migration from metadata to IndexedDB
   const migrateDocsFromMetadata = async (parsedDocs, cryptoKey) => {
@@ -175,6 +177,7 @@ export const FinanceProvider = ({ children }) => {
     if (parsed.customCategories) setCustomCategories(parsed.customCategories);
     if (parsed.recurringTemplates) setRecurringTemplates(parsed.recurringTemplates);
     if (parsed.wealthHistory) setWealthHistory(parsed.wealthHistory);
+    if (parsed.aiHistory) setAiHistory(parsed.aiHistory);
   }, []);
 
   // Cloud sync helper function
@@ -186,7 +189,7 @@ export const FinanceProvider = ({ children }) => {
       const dataToEncrypt = forceData || {
         accounts, dependents, transactions, reminders, investments, documents,
         profile, investmentGoal, budgets, settings, savingsGoals,
-        customCategories, recurringTemplates, wealthHistory,
+        customCategories, recurringTemplates, wealthHistory, aiHistory
       };
       
       const ciphertext = await encryptData(JSON.stringify(dataToEncrypt), key);
@@ -281,6 +284,7 @@ export const FinanceProvider = ({ children }) => {
       { storageKey: 'wealth_mgr_custom_categories',   stateKey: 'customCategories',    setter: setCustomCategories,    def: { income: [], expense: [] } },
       { storageKey: 'wealth_mgr_recurring_templates', stateKey: 'recurringTemplates',  setter: setRecurringTemplates,  def: [] },
       { storageKey: 'wealth_mgr_wealth_history',      stateKey: 'wealthHistory',       setter: setWealthHistory,       def: [] },
+      { storageKey: 'wealth_mgr_ai_history',          stateKey: 'aiHistory',           setter: setAiHistory,           def: [] },
     ];
 
     for (const key of keys) {
@@ -338,6 +342,7 @@ export const FinanceProvider = ({ children }) => {
       setCustomCategories({ income: [], expense: [] });
       setRecurringTemplates([]);
       setWealthHistory([]);
+      setAiHistory([]);
       
       return true;
     } catch (error) {
@@ -463,6 +468,7 @@ export const FinanceProvider = ({ children }) => {
     setCustomCategories({ income: [], expense: [] });
     setRecurringTemplates([]);
     setWealthHistory([]);
+    setAiHistory([]);
   }, []);
 
   const registerCloud = useCallback(async (user, password) => {
@@ -512,7 +518,7 @@ export const FinanceProvider = ({ children }) => {
 
       const dataToSync = {
         accounts, dependents, transactions, reminders, investments, documents, profile,
-        investmentGoal, budgets, settings, savingsGoals, customCategories, recurringTemplates, wealthHistory
+        investmentGoal, budgets, settings, savingsGoals, customCategories, recurringTemplates, wealthHistory, aiHistory
       };
 
       await syncWithCloud(activeKey, token, dataToSync);
@@ -845,6 +851,8 @@ export const FinanceProvider = ({ children }) => {
       addRecurringTemplate,
       deleteRecurringTemplate,
       wealthHistory,
+      aiHistory,
+      setAiHistory,
       setupMasterPassword,
       unlockWallet,
       lockWallet,

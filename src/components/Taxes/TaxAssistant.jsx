@@ -1,13 +1,32 @@
-import React, { useContext, useMemo } from 'react';
+import React, { useContext, useMemo, useState } from 'react';
 import { FinanceContext } from '../../context/FinanceContext';
-import { FileText, ShieldAlert, Award, Stethoscope, GraduationCap, CheckCircle, Calculator } from 'lucide-react';
+import { FileText, ShieldAlert, Award, Stethoscope, GraduationCap, CheckCircle, Calculator, Sparkles } from 'lucide-react';
 import { formatBRL } from '../../utils/financeUtils';
+import AIDiagnosticsDrawer from '../layout/AIDiagnosticsDrawer';
 
 const TaxAssistant = () => {
-  const { transactions, dependents, investments } = useContext(FinanceContext);
+  const { transactions, dependents, investments, jwtToken } = useContext(FinanceContext);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   // 1. Get deductible transactions
   const deductibleTransactions = transactions.filter(t => t.isTaxDeductible && t.type === 'expense');
+
+  const contextSummary = useMemo(() => ({
+    overview: {
+      totalDeductiblesValue: deductibleTransactions.reduce((acc, curr) => acc + curr.amount, 0),
+      dependentsCount: dependents.length
+    },
+    taxDeductibles: deductibleTransactions.map(t => ({
+      description: t.description,
+      amount: t.amount,
+      category: t.category,
+      date: t.date
+    })),
+    dependents: dependents.map(d => ({ name: d.name, relation: d.relation, age: d.age }))
+  }), [deductibleTransactions, dependents]);
+
+  const taxPrompt = "Faça uma análise rigorosa do meu cenário de deduções fiscais atuais. Verifique se o total deduzido compensa fazer a Declaração Completa do IRPF frente ao Desconto Simplificado (limite de R$ 16.754,34). Comente sobre despesas com saúde, educação, previdência privada (PGBL) e dependentes. Mantenha um tom profissional e didático de contador sênior, apresentando sugestões em listas ou tabelas.";
+
 
   // Breakdown by category (Health vs Education)
   const healthDeductibles = deductibleTransactions.filter(t => t.category === 'Saúde');
@@ -42,9 +61,15 @@ const TaxAssistant = () => {
 
   return (
     <div className="taxes-container">
-      <div className="section-header">
-        <h1>Assistente Fiscal & IRPF</h1>
-        <p>Acompanhe suas despesas dedutíveis em tempo real e prepare-se para a declaração anual.</p>
+      <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <h1>Assistente Fiscal & IRPF</h1>
+          <p>Acompanhe suas despesas dedutíveis em tempo real e prepare-se para a declaração anual.</p>
+        </div>
+        <button className="ai-diagnostics-float-btn" onClick={() => setIsDrawerOpen(true)}>
+          <Sparkles size={16} />
+          Diagnóstico de IA
+        </button>
       </div>
 
       <div className="taxes-split-grid">
@@ -186,9 +211,17 @@ const TaxAssistant = () => {
                 <p className="empty-state text-sm text-secondary italic">Nenhuma despesa dedutível registrada.</p>
               )}
             </div>
-          </div>
         </div>
       </div>
+
+      <AIDiagnosticsDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        title="Diagnóstico Fiscal com IA"
+        systemPrompt={taxPrompt}
+        contextSummary={contextSummary}
+        jwtToken={jwtToken}
+      />
     </div>
   );
 };

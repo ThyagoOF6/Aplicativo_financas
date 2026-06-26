@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useContext, useMemo } from 'react';
 import { FinanceContext } from '../../context/FinanceContext';
+import { useToast } from '../layout/Toast';
 import { 
   Sparkles, 
   Send, 
@@ -11,7 +12,11 @@ import {
   Target, 
   Info,
   ShieldCheck,
-  AlertTriangle
+  AlertTriangle,
+  Paperclip,
+  X,
+  CheckCircle,
+  FileIcon
 } from 'lucide-react';
 import './AIAdvisor.css';
 
@@ -24,20 +29,38 @@ const AIAdvisor = () => {
     investments, 
     savingsGoals, 
     dependents,
-    jwtToken
+    jwtToken,
+    aiHistory,
+    setAiHistory,
+    addSavingsGoal
   } = useContext(FinanceContext);
 
-  const [messages, setMessages] = useState([
-    { 
-      sender: 'ai', 
-      text: 'Olá! Sou o seu Consultor Especialista em Economia, Contabilidade e Planejamento Fiscal. Com base nos seus dados financeiros atuais (criptografados e protegidos), posso ajudar você a otimizar sua carteira de investimentos, planejar seu Imposto de Renda (IRPF) ou analisar seus despesas dedutíveis. Como posso ajudar você hoje?' 
-    }
-  ]);
+  const { addToast } = useToast();
+
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   
+  // File upload states
+  const [attachedFile, setAttachedFile] = useState(null);
+  const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
+
+  // Tracks message indexes of goals that were already created or ignored
+  const [processedGoals, setProcessedGoals] = useState({});
+
+  const welcomeMessage = { 
+    sender: 'ai', 
+    text: 'Olá! Sou o seu Consultor Especialista em Economia, Contabilidade e Planejamento Fiscal. Com base nos seus dados financeiros atuais (criptografados e protegidos), posso ajudar você a otimizar sua carteira de investimentos, planejar seu Imposto de Renda (IRPF) ou analisar suas despesas dedutíveis. Como posso ajudar você hoje?' 
+  };
+
+  // Safe wrapper around history to fallback to welcome message if empty
+  const activeMessages = useMemo(() => {
+    if (!aiHistory || aiHistory.length === 0) {
+      return [welcomeMessage];
+    }
+    return aiHistory;
+  }, [aiHistory]);
 
   // Automatically scroll to bottom of chat
   const scrollToBottom = () => {
@@ -46,11 +69,10 @@ const AIAdvisor = () => {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, isLoading]);
+  }, [activeMessages, isLoading]);
 
   // Context summarization (anonymized/safe data payload)
   const financeContextSummary = useMemo(() => {
-    // Deductibles breakdown
     const deductibles = transactions.filter(t => t.isTaxDeductible && t.type === 'expense');
     
     return {
@@ -99,22 +121,32 @@ const AIAdvisor = () => {
 
   const handleSendMessage = async (textToSend) => {
     const text = textToSend || inputValue;
-    if (!text.trim()) return;
+    if (!text.trim() && !attachedFile) return;
 
     if (!textToSend) {
       setInputValue('');
     }
 
     // Add user message to UI
-    const newMessages = [...messages, { sender: 'user', text }];
-    setMessages(newMessages);
+    let userMsgText = text;
+    if (attachedFile) {
+      userMsgText = `${text}\n\n*[Arquivo Anexo: ${attachedFile.name}]*`;
+    }
+
+    const nextUserMessages = [...activeMessages, { sender: 'user', text: userMsgText }];
+    setAiHistory(nextUserMessages);
     setIsLoading(true);
     setErrorMessage('');
 
+    // Capture file data and reset the input
+    const filePayload = attachedFile ? { mimeType: attachedFile.mimeType, data: attachedFile.data } : null;
+    setAttachedFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+
     try {
-      // Map message history to payload (excluding the very first welcome message)
-      const historyPayload = messages
-        .slice(1)
+      // Map message history to payload (excluding the welcome message)
+      const historyPayload = nextUserMessages
+        .slice(1, -1) // slice off the prompt message and current question
         .map(m => ({
           sender: m.sender,
           text: m.text
@@ -127,9 +159,10 @@ const AIAdvisor = () => {
           'Authorization': `Bearer ${jwtToken}`
         },
         body: JSON.stringify({
-          question: text,
+          question: text || "Analise este documento em anexo.",
           context: financeContextSummary,
-          history: historyPayload
+          history: historyPayload,
+          file: filePayload
         })
       });
 
@@ -139,11 +172,11 @@ const AIAdvisor = () => {
       }
 
       const data = await res.json();
-      setMessages(prev => [...prev, { sender: 'ai', text: data.reply }]);
+      setAiHistory(prev => [...(prev.length === 0 ? nextUserMessages : prev), { sender: 'ai', text: data.reply }]);
     } catch (err) {
       console.error('Advisor Error:', err);
       setErrorMessage(err.message || 'Erro ao conectar ao consultor financeiro.');
-      setMessages(prev => [...prev, { 
+      setAiHistory(prev => [...(prev.length === 0 ? nextUserMessages : prev), { 
         sender: 'ai', 
         text: 'Desculpe, ocorreu um erro de conexão com a Inteligência Artificial. Por favor, verifique se a sua chave API do Gemini foi inserida corretamente no arquivo .env do servidor e tente novamente.' 
       }]);
@@ -157,6 +190,60 @@ const AIAdvisor = () => {
       e.preventDefault();
       handleSendMessage();
     }
+  };
+
+  // Handles clicking the Paperclip icon
+  const handlePaperclipClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  // Handles picking a file
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Check size limit (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert("O arquivo anexo excede o limite de 5MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setAttachedFile({
+        name: file.name,
+        mimeType: file.type,
+        data: reader.result.split(',')[1] // Base64 data string
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Dynamic Goal creation logic
+  const handleCreateGoal = (idx, goalData) => {
+    addSavingsGoal({
+      label: goalData.label,
+      target: parseFloat(goalData.target),
+      current: parseFloat(goalData.current || 0)
+    });
+    setProcessedGoals(prev => ({ ...prev, [idx]: 'created' }));
+    addToast(`Meta "${goalData.label}" criada com sucesso!`, 'success');
+  };
+
+  // Parse structured action commands in message replies
+  const parseGoalAction = (text) => {
+    const goalRegex = /\[CREATE_GOAL:\s*({[^}]+})\s*\]/g;
+    const match = goalRegex.exec(text);
+    if (match) {
+      try {
+        const data = JSON.parse(match[1]);
+        const cleanText = text.replace(goalRegex, '').trim();
+        return { cleanText, goalData: data };
+      } catch (e) {
+        console.error("Failed to parse goal action JSON:", e);
+      }
+    }
+    return { cleanText: text, goalData: null };
   };
 
   // Quick Action Buttons
@@ -320,6 +407,8 @@ const AIAdvisor = () => {
     return grouped;
   };
 
+  const formatBRL = (val) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+
   return (
     <div className="ai-advisor-container">
       <div className="advisor-grid">
@@ -344,22 +433,65 @@ const AIAdvisor = () => {
 
           {/* Messages Wrapper */}
           <div className="messages-container">
-            {messages.map((msg, idx) => (
-              <div key={idx} className={`message-row ${msg.sender === 'user' ? 'user-row' : 'ai-row'}`}>
-                <div className="message-icon flex-center">
-                  {msg.sender === 'user' ? <User size={16} /> : <Bot size={16} />}
+            {activeMessages.map((msg, idx) => {
+              // Parse the message for goal actions
+              const { cleanText, goalData } = msg.sender === 'ai' ? parseGoalAction(msg.text) : { cleanText: msg.text, goalData: null };
+              
+              return (
+                <div key={idx} className={`message-row ${msg.sender === 'user' ? 'user-row' : 'ai-row'}`}>
+                  <div className="message-icon flex-center">
+                    {msg.sender === 'user' ? <User size={16} /> : <Bot size={16} />}
+                  </div>
+                  <div className="message-bubble">
+                    {msg.sender === 'user' ? (
+                      <p className="message-text" style={{ whiteSpace: 'pre-wrap' }}>{cleanText}</p>
+                    ) : (
+                      <div className="message-text-markdown">
+                        {renderMarkdown(cleanText)}
+                        
+                        {/* Interactive Goal Suggestion Card */}
+                        {goalData && (
+                          <div className="ai-goal-card mt-sm border-accent">
+                            <div className="flex-center-y gap-sm">
+                              <Target size={16} className="text-accent" />
+                              <span className="font-bold text-xs text-primary">Meta Sugerida pela IA</span>
+                            </div>
+                            <p className="text-xs text-secondary mt-xs">
+                              Título: <strong className="text-primary">{goalData.label}</strong> • Objetivo: <strong className="text-primary">{formatBRL(goalData.target)}</strong>
+                            </p>
+                            
+                            {processedGoals[idx] === 'created' ? (
+                              <div className="text-success text-xs font-semibold mt-sm flex-center-y gap-xs">
+                                <CheckCircle size={14} /> Meta criada no sistema!
+                              </div>
+                            ) : processedGoals[idx] === 'ignored' ? (
+                              <div className="text-secondary text-xs italic mt-sm">
+                                Sugestão ignorada.
+                              </div>
+                            ) : (
+                              <div className="flex gap-sm mt-sm">
+                                <button 
+                                  className="btn btn-sm btn-accent" 
+                                  onClick={() => handleCreateGoal(idx, goalData)}
+                                >
+                                  Confirmar
+                                </button>
+                                <button 
+                                  className="btn btn-sm btn-secondary"
+                                  onClick={() => setProcessedGoals(prev => ({ ...prev, [idx]: 'ignored' }))}
+                                >
+                                  Ignorar
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="message-bubble">
-                  {msg.sender === 'user' ? (
-                    <p className="message-text">{msg.text}</p>
-                  ) : (
-                    <div className="message-text-markdown">
-                      {renderMarkdown(msg.text)}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
             
             {isLoading && (
               <div className="message-row ai-row">
@@ -389,7 +521,7 @@ const AIAdvisor = () => {
 
           {/* Input Area */}
           <div className="input-area">
-            {messages.length === 1 && (
+            {activeMessages.length === 1 && !attachedFile && (
               <div className="quick-actions-grid">
                 {quickActions.map((action, idx) => {
                   const Icon = action.icon;
@@ -406,11 +538,47 @@ const AIAdvisor = () => {
                 })}
               </div>
             )}
+
+            {/* Attached File Preview Area */}
+            {attachedFile && (
+              <div className="attached-file-preview flex-between flex-center-y">
+                <div className="flex-center-y gap-sm">
+                  <FileIcon size={20} className="text-accent" />
+                  <div>
+                    <p className="text-xs font-semibold text-primary">{attachedFile.name}</p>
+                    <p className="text-xxs text-secondary">Documento pronto para análise OCR</p>
+                  </div>
+                </div>
+                <button 
+                  className="remove-file-btn flex-center"
+                  onClick={() => setAttachedFile(null)}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            )}
             
             <div className="input-field-wrapper">
+              {/* File input and button */}
+              <input 
+                type="file"
+                ref={fileInputRef}
+                style={{ display: 'none' }}
+                onChange={handleFileChange}
+                accept="image/*,application/pdf"
+              />
+              <button 
+                className="attach-file-btn flex-center"
+                onClick={handlePaperclipClick}
+                title="Anexar comprovante/recibo"
+                disabled={isLoading}
+              >
+                <Paperclip size={20} />
+              </button>
+
               <textarea
                 className="input-textarea"
-                placeholder="Pergunte sobre investimentos, deduções fiscais ou planejamento financeiro..."
+                placeholder={attachedFile ? "Escreva algo sobre este arquivo..." : "Pergunte sobre investimentos, deduções fiscais ou envie um recibo..."}
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleKeyDown}
@@ -420,7 +588,7 @@ const AIAdvisor = () => {
               <button 
                 className="send-message-btn flex-center"
                 onClick={() => handleSendMessage()}
-                disabled={isLoading || !inputValue.trim()}
+                disabled={isLoading || (!inputValue.trim() && !attachedFile)}
               >
                 <Send size={18} />
               </button>

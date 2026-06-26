@@ -1,0 +1,129 @@
+.drawer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  justify-content: flex-end;
+  animation: fadeInOverlay 0.3s ease-out;
+}
+
+@keyframes fadeInOverlay {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.drawer-container {
+  width: 500px;
+  max-width: 90vw;
+  height: 100vh;
+  background: var(--bg-color);
+  border-left: 1px solid var(--border-color);
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  animation: slideInDrawer 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideInDrawer {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.drawer-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  background: rgba(11, 15, 25, 0.2);
+}
+
+.drawer-title {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.drawer-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 50%;
+  transition: var(--transition-smooth);
+}
+
+.drawer-close-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+.drawer-body {
+  flex: 1;
+  padding: 2rem;
+  overflow-y: auto;
+}
+
+.drawer-loading {
+  height: 60%;
+}
+
+.drawer-error {
+  padding: 1.5rem;
+  background: var(--danger-bg);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: var(--border-radius-sm);
+  color: var(--text-primary);
+}
+
+.drawer-markdown-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  animation: fadeInUp 0.4s ease-out;
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.drawer-footer {
+  padding: 1.25rem 2rem;
+  border-top: 1px solid var(--border-color);
+  background: rgba(11, 15, 25, 0.1);
+}
+
+/* Pulsing Float Button for screens */
+.ai-diagnostics-float-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--accent-glow);
+  border: 1px solid var(--accent-color);
+  color: var(--accent-color);
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: var(--transition-smooth);
+  box-shadow: 0 0 10px var(--accent-glow);
+  animation: pulseButton 2s infinite alternate;
+}
+
+.ai-diagnostics-float-btn:hover {
+  background: var(--accent-color);
+  color: #0b0f19;
+  transform: translateY(-1px);
+  box-shadow: 0 0 18px var(--accent-color);
+  animation: none;
+}
+
+@keyframes pulseButton {
+  0% { box-shadow: 0 0 5px var(--accent-glow); border-color: rgba(56, 189, 248, 0.4); }
+  100% { box-shadow: 0 0 15px rgba(56, 189, 248, 0.4); border-color: rgba(56, 189, 248, 1); }
+}
