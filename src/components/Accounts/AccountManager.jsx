@@ -16,6 +16,8 @@ const AccountManager = () => {
   const [type, setType] = useState('Banco');
   const [balance, setBalance] = useState('');
   const [includeInTax, setIncludeInTax] = useState(true);
+  const [benefits, setBenefits] = useState([]);
+  const [customBenefit, setCustomBenefit] = useState('');
 
   const handleEditClick = (acc) => {
     setEditingAccount(acc);
@@ -23,6 +25,7 @@ const AccountManager = () => {
     setType(acc.type);
     setBalance(acc.balance.toString());
     setIncludeInTax(acc.includeInTax);
+    setBenefits(acc.benefits || []);
     setShowForm(true);
   };
 
@@ -33,6 +36,8 @@ const AccountManager = () => {
     setType('Banco');
     setBalance('');
     setIncludeInTax(true);
+    setBenefits([]);
+    setCustomBenefit('');
   };
 
   const handleSubmit = (e) => {
@@ -43,7 +48,8 @@ const AccountManager = () => {
       name,
       type,
       balance: parseFloat(balance),
-      includeInTax
+      includeInTax,
+      benefits: type === 'Cartão de Crédito' ? benefits : []
     };
 
     if (editingAccount) {
@@ -110,6 +116,7 @@ const AccountManager = () => {
                 <option value="Banco">Banco (Conta Corrente)</option>
                 <option value="Corretora">Corretora (Investimentos)</option>
                 <option value="Carteira Física">Carteira Física (Dinheiro Vivo)</option>
+                <option value="Cartão de Crédito">Cartão de Crédito</option>
                 <option value="Outro">Outro</option>
               </select>
             </div>
@@ -137,6 +144,85 @@ const AccountManager = () => {
               <label htmlFor="acc-tax">Declarar no Imposto de Renda (Bens e Direitos)</label>
             </div>
           </div>
+
+          {type === 'Cartão de Crédito' && (
+            <div className="benefits-selection-wrapper">
+              <label className="font-semibold block mb-xs" style={{ display: 'block', marginBottom: '8px' }}>Benefícios do Cartão de Crédito</label>
+              
+              <div className="quick-benefits-grid">
+                {['💵 Cashback', '✈️ Milhas / Pontos', '🎟️ Sala VIP', '💳 Sem Anuidade', '🛡️ Seguro Viagem'].map((preset) => {
+                  const isActive = benefits.includes(preset);
+                  return (
+                    <div 
+                      key={preset}
+                      className={`quick-benefit-checkbox flex-center-y ${isActive ? 'active' : ''}`}
+                      onClick={() => {
+                        if (isActive) {
+                          setBenefits(benefits.filter(b => b !== preset));
+                        } else {
+                          setBenefits([...benefits, preset]);
+                        }
+                      }}
+                    >
+                      <span>{preset}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="custom-benefit">Adicionar Benefício Personalizado</label>
+                <div className="custom-benefit-input-group">
+                  <input 
+                    id="custom-benefit"
+                    type="text" 
+                    placeholder="Ex: Acesso ilimitado à Sala VIP Mastercard" 
+                    value={customBenefit}
+                    onChange={(e) => setCustomBenefit(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (customBenefit.trim() && !benefits.includes(customBenefit.trim())) {
+                          setBenefits([...benefits, customBenefit.trim()]);
+                          setCustomBenefit('');
+                        }
+                      }
+                    }}
+                  />
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => {
+                      if (customBenefit.trim() && !benefits.includes(customBenefit.trim())) {
+                        setBenefits([...benefits, customBenefit.trim()]);
+                        setCustomBenefit('');
+                      }
+                    }}
+                  >
+                    Adicionar
+                  </button>
+                </div>
+              </div>
+
+              {benefits.filter(b => !['💵 Cashback', '✈️ Milhas / Pontos', '🎟️ Sala VIP', '💳 Sem Anuidade', '🛡️ Seguro Viagem'].includes(b)).length > 0 && (
+                <div className="custom-benefits-tags-list">
+                  {benefits.filter(b => !['💵 Cashback', '✈️ Milhas / Pontos', '🎟️ Sala VIP', '💳 Sem Anuidade', '🛡️ Seguro Viagem'].includes(b)).map((b, idx) => (
+                    <span key={idx} className="custom-benefit-tag">
+                      {b}
+                      <button 
+                        type="button" 
+                        onClick={() => setBenefits(benefits.filter(item => item !== b))}
+                        title="Remover benefício"
+                      >
+                        ✕
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="form-actions">
             <button type="submit" className="btn btn-primary">{editingAccount ? 'Salvar Alterações' : 'Salvar Conta'}</button>
             <button type="button" className="btn btn-ghost" onClick={handleFormClose}>Cancelar</button>
