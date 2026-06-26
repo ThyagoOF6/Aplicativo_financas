@@ -3,6 +3,7 @@ import { FinanceContext } from '../../context/FinanceContext';
 import { Settings, Shield, Target, Sun, Moon, Tag, Trash2, Plus } from 'lucide-react';
 import { useToast } from './Toast';
 import { formatBRL } from '../../utils/financeUtils';
+import { runBrowserTests } from '../../utils/runBrowserTests';
 
 const DEFAULT_INCOME_CATS  = ['Salário', 'Pró-labore', 'Rendimentos', 'Venda de Ativos', 'Outros'];
 const DEFAULT_EXPENSE_CATS = ['Alimentação', 'Transporte', 'Saúde', 'Educação', 'Moradia', 'Lazer', 'Impostos', 'Outros'];
@@ -15,6 +16,27 @@ const SettingsManager = () => {
     addCustomCategory, deleteCustomCategory,
   } = useContext(FinanceContext);
   const { addToast } = useToast();
+
+  const [testResults, setTestResults] = useState(null);
+  const [isRunningTests, setIsRunningTests] = useState(false);
+
+  const handleRunTests = async () => {
+    setIsRunningTests(true);
+    try {
+      const results = await runBrowserTests();
+      setTestResults(results);
+      if (results.totalFailed === 0) {
+        addToast(`${results.totalPassed} testes de unidade executados e aprovados!`, 'success');
+      } else {
+        addToast(`${results.totalFailed} testes falharam. Verifique a lista.`, 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      addToast('Erro ao executar testes do sistema.', 'error');
+    } finally {
+      setIsRunningTests(false);
+    }
+  };
 
   const [autoLock, setAutoLock] = useState(settings?.autoLockMinutes || 5);
   const [theme, setTheme] = useState(settings?.theme || 'dark');
@@ -234,6 +256,82 @@ const SettingsManager = () => {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* System Diagnostics & Tests */}
+      <div className="card glass-card flex-column gap-md">
+        <div className="card-header flex-between flex-center-y" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+          <div className="flex-center-y">
+            <Shield className="text-accent mr-sm" size={20} style={{ marginRight: '8px' }} />
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>Diagnóstico & Testes do Sistema</h3>
+          </div>
+          <button 
+            type="button" 
+            className={`btn ${isRunningTests ? 'btn-secondary' : 'btn-primary'} flex-center-y`}
+            onClick={handleRunTests}
+            disabled={isRunningTests}
+            style={{ padding: '8px 16px', fontSize: '0.85rem' }}
+          >
+            {isRunningTests ? 'Executando...' : 'Executar Testes'}
+          </button>
+        </div>
+        
+        <p className="text-secondary text-xs" style={{ margin: 0 }}>
+          Valide a integridade dos algoritmos financeiros, regras de datas, geração de calendário, importadores OFX/CSV e a criptografia ponta a ponta (AES-GCM/PBKDF2/SHA-256) diretamente no navegador.
+        </p>
+
+        {testResults && (
+          <div className="test-results-panel flex-column gap-sm animate-fade-in" style={{
+            backgroundColor: 'rgba(0,0,0,0.2)',
+            borderRadius: 'var(--border-radius)',
+            padding: '16px',
+            border: '1px solid ' + (testResults.totalFailed > 0 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)')
+          }}>
+            <div className="flex-between flex-center-y" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '10px' }}>
+              <span className="text-sm font-semibold">Resumo dos Testes:</span>
+              <span className="text-xs font-bold" style={{
+                color: testResults.totalFailed > 0 ? '#ef4444' : '#10b981',
+                padding: '4px 8px',
+                borderRadius: '4px',
+                backgroundColor: testResults.totalFailed > 0 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)'
+              }}>
+                {testResults.totalFailed > 0 
+                  ? `❌ ${testResults.totalFailed} falha(s) detectada(s)` 
+                  : `✅ Todos os ${testResults.totalPassed} testes passaram`}
+              </span>
+            </div>
+
+            <div className="suites-list flex-column gap-md" style={{ maxHeight: '300px', overflowY: 'auto', marginTop: '10px' }}>
+              {testResults.results.map((suite, sIdx) => (
+                <div key={sIdx} className="suite-item flex-column gap-xs" style={{ marginBottom: '12px' }}>
+                  <h4 className="text-xs font-bold text-secondary" style={{ textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+                    {suite.name}
+                  </h4>
+                  <div className="specs-list flex-column gap-xxs" style={{ paddingLeft: '8px' }}>
+                    {suite.specs.map((spec, specIdx) => (
+                      <div key={specIdx} className="spec-item flex-between flex-center-y" style={{
+                        padding: '6px 8px',
+                        borderRadius: '4px',
+                        backgroundColor: 'rgba(255,255,255,0.02)',
+                        fontSize: '0.8rem',
+                        marginBottom: '4px'
+                      }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>{spec.description}</span>
+                        {spec.passed ? (
+                          <span style={{ color: '#10b981', fontWeight: 'bold' }}>✓ Passou</span>
+                        ) : (
+                          <span style={{ color: '#ef4444', fontWeight: 'bold' }} title={spec.error}>
+                            ✗ Falhou: {spec.error}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
