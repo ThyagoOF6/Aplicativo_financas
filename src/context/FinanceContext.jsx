@@ -35,6 +35,7 @@ export const FinanceProvider = ({ children }) => {
   const [investmentGoal, setInvestmentGoal] = useState({ target: 0, current: 0, label: 'Reserva de Emergência' });
   const [budgets, setBudgets] = useState([]);
   const [settings, setSettings] = useState({ autoLockMinutes: 5, theme: 'dark' });
+  const [savingsGoals, setSavingsGoals] = useState([]);
 
   // Sync to raw storage (only when unlocked and key exists)
   useEffect(() => {
@@ -117,6 +118,14 @@ export const FinanceProvider = ({ children }) => {
     }
   }, [settings, isLocked, sessionKey]);
 
+  useEffect(() => {
+    if (!isLocked && sessionKey) {
+      encryptData(JSON.stringify(savingsGoals), sessionKey).then(enc => {
+        setRawStorageItem('wealth_mgr_savings_goals', enc);
+      });
+    }
+  }, [savingsGoals, isLocked, sessionKey]);
+
   // Document migration from metadata to IndexedDB
   const migrateDocsFromMetadata = async (parsedDocs, cryptoKey) => {
     if (!Array.isArray(parsedDocs)) return parsedDocs;
@@ -155,7 +164,8 @@ export const FinanceProvider = ({ children }) => {
         profile,
         investmentGoal,
         budgets,
-        settings
+        settings,
+        savingsGoals
       };
       
       const ciphertext = await encryptData(JSON.stringify(dataToEncrypt), key);
@@ -178,7 +188,7 @@ export const FinanceProvider = ({ children }) => {
       console.error("Cloud sync error:", err);
       setSyncStatus('error');
     }
-  }, [accounts, dependents, transactions, reminders, investments, documents, profile, investmentGoal, sessionKey, jwtToken]);
+  }, [accounts, dependents, transactions, reminders, investments, documents, profile, investmentGoal, savingsGoals, sessionKey, jwtToken]);
 
   // Debounced auto sync triggers when local state changes
   useEffect(() => {
@@ -188,7 +198,7 @@ export const FinanceProvider = ({ children }) => {
       }, 5000);
       return () => clearTimeout(timeout);
     }
-  }, [accounts, dependents, transactions, reminders, investments, documents, profile, investmentGoal, budgets, settings, isLocked, sessionKey, jwtToken, syncWithCloud]);
+  }, [accounts, dependents, transactions, reminders, investments, documents, profile, investmentGoal, budgets, settings, savingsGoals, isLocked, sessionKey, jwtToken, syncWithCloud]);
 
   // Decrypts and loads all local database states
   const decryptAndLoadState = async (cryptoKey) => {
@@ -205,7 +215,8 @@ export const FinanceProvider = ({ children }) => {
       { storageKey: 'wealth_mgr_profile', setter: setProfile, def: '' },
       { storageKey: 'wealth_mgr_investment_goal', setter: setInvestmentGoal, def: { target: 0, current: 0, label: 'Reserva de Emergência' } },
       { storageKey: 'wealth_mgr_budgets', setter: setBudgets, def: [] },
-      { storageKey: 'wealth_mgr_settings', setter: setSettings, def: { autoLockMinutes: 5, theme: 'dark' } }
+      { storageKey: 'wealth_mgr_settings', setter: setSettings, def: { autoLockMinutes: 5, theme: 'dark' } },
+      { storageKey: 'wealth_mgr_savings_goals', setter: setSavingsGoals, def: [] }
     ];
 
     for (const key of keys) {
@@ -255,6 +266,7 @@ export const FinanceProvider = ({ children }) => {
       setInvestmentGoal({ target: 0, current: 0, label: 'Reserva de Emergência' });
       setBudgets([]);
       setSettings({ autoLockMinutes: 5, theme: 'dark' });
+      setSavingsGoals([]);
       
       return true;
     } catch (error) {
@@ -318,6 +330,7 @@ export const FinanceProvider = ({ children }) => {
                 if (parsed.investmentGoal) setInvestmentGoal(parsed.investmentGoal);
                 if (parsed.budgets) setBudgets(parsed.budgets);
                 if (parsed.settings) setSettings(parsed.settings);
+                if (parsed.savingsGoals) setSavingsGoals(parsed.savingsGoals);
               }
             }).catch(err => {
               console.warn("Could not auto-fetch vault:", err);
@@ -355,6 +368,7 @@ export const FinanceProvider = ({ children }) => {
     setProfile('');
     setBudgets([]);
     setSettings({ autoLockMinutes: 5, theme: 'dark' });
+    setSavingsGoals([]);
   }, []);
 
   const registerCloud = useCallback(async (user, password) => {
@@ -403,7 +417,7 @@ export const FinanceProvider = ({ children }) => {
       setSyncStatus('synced');
 
       const dataToSync = {
-        accounts, dependents, transactions, reminders, investments, documents, profile, investmentGoal, budgets, settings
+        accounts, dependents, transactions, reminders, investments, documents, profile, investmentGoal, budgets, settings, savingsGoals
       };
 
       await syncWithCloud(activeKey, token, dataToSync);
@@ -412,7 +426,7 @@ export const FinanceProvider = ({ children }) => {
       console.error("Cloud registration error:", error);
       return { success: false, error: error.message };
     }
-  }, [accounts, dependents, transactions, reminders, investments, documents, profile, investmentGoal, sessionKey, syncWithCloud]);
+  }, [accounts, dependents, transactions, reminders, investments, documents, profile, investmentGoal, savingsGoals, sessionKey, syncWithCloud]);
 
   const loginCloud = useCallback(async (user, password) => {
     try {
@@ -465,6 +479,7 @@ export const FinanceProvider = ({ children }) => {
           if (parsed.investmentGoal) setInvestmentGoal(parsed.investmentGoal);
           if (parsed.budgets) setBudgets(parsed.budgets);
           if (parsed.settings) setSettings(parsed.settings);
+          if (parsed.savingsGoals) setSavingsGoals(parsed.savingsGoals);
 
           // Update backups
           setRawStorageItem('wealth_mgr_accounts', await encryptData(JSON.stringify(parsed.accounts || []), cryptoKey));
@@ -476,6 +491,7 @@ export const FinanceProvider = ({ children }) => {
           setRawStorageItem('wealth_mgr_investment_goal', await encryptData(JSON.stringify(parsed.investmentGoal || {}), cryptoKey));
           setRawStorageItem('wealth_mgr_budgets', await encryptData(JSON.stringify(parsed.budgets || []), cryptoKey));
           setRawStorageItem('wealth_mgr_settings', await encryptData(JSON.stringify(parsed.settings || { autoLockMinutes: 5, theme: 'dark' }), cryptoKey));
+          setRawStorageItem('wealth_mgr_savings_goals', await encryptData(JSON.stringify(parsed.savingsGoals || []), cryptoKey));
         }
       }
 
@@ -569,7 +585,17 @@ export const FinanceProvider = ({ children }) => {
   }, []);
 
   const addReminder = useCallback((rem) => {
-    setReminders(prev => [...prev, { ...rem, id: crypto.randomUUID(), amount: parseFloat(rem.amount), paid: false }]);
+    setReminders(prev => [...prev, { 
+      ...rem, 
+      id: crypto.randomUUID(), 
+      amount: parseFloat(rem.amount), 
+      paid: false,
+      priority: rem.priority || 'important'
+    }]);
+  }, []);
+
+  const updateReminder = useCallback((updatedRem) => {
+    setReminders(prev => prev.map(rem => rem.id === updatedRem.id ? { ...rem, ...updatedRem, amount: parseFloat(updatedRem.amount) } : rem));
   }, []);
 
   const toggleReminderPaid = useCallback((id) => {
@@ -667,6 +693,7 @@ export const FinanceProvider = ({ children }) => {
     if (data.investmentGoal) setInvestmentGoal(data.investmentGoal);
     if (data.budgets) setBudgets(data.budgets);
     if (data.settings) setSettings(data.settings);
+    if (data.savingsGoals) setSavingsGoals(data.savingsGoals);
   }, []);
 
   const deleteDocument = useCallback((id) => {
@@ -688,6 +715,20 @@ export const FinanceProvider = ({ children }) => {
       setProfile,
       investmentGoal,
       setInvestmentGoal,
+      savingsGoals,
+      addSavingsGoal: useCallback((goal) => {
+        setSavingsGoals(prev => [...prev, { ...goal, id: crypto.randomUUID(), target: parseFloat(goal.target), current: parseFloat(goal.current || 0) }]);
+      }, []),
+      updateSavingsGoal: useCallback((updatedGoal) => {
+        setSavingsGoals(prev => prev.map(g => g.id === updatedGoal.id ? {
+          ...updatedGoal,
+          target: parseFloat(updatedGoal.target),
+          current: parseFloat(updatedGoal.current)
+        } : g));
+      }, []),
+      deleteSavingsGoal: useCallback((id) => {
+        setSavingsGoals(prev => prev.filter(g => g.id !== id));
+      }, []),
       setupMasterPassword,
       unlockWallet,
       lockWallet,
@@ -702,6 +743,7 @@ export const FinanceProvider = ({ children }) => {
       addReminder,
       toggleReminderPaid,
       deleteReminder,
+      updateReminder,
       addInvestment,
       deleteInvestment,
       updateInvestment,

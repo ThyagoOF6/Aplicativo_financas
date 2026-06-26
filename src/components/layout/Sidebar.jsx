@@ -9,7 +9,8 @@ import {
   TrendingUp, 
   FolderOpen,
   BarChart3,
-  Settings
+  Settings,
+  Target
 } from 'lucide-react';
 
 const Sidebar = ({ activeTab, setActiveTab }) => {
@@ -21,6 +22,7 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
     { id: 'taxes', label: 'Assistente Fiscal', icon: FileText },
     { id: 'reminders', label: 'Alertas & Contas', icon: Calendar },
     { id: 'investments', label: 'Investimentos', icon: TrendingUp },
+    { id: 'goals', label: 'Metas de Economia', icon: Target },
     { id: 'reports', label: 'Relatórios', icon: BarChart3 },
     { id: 'datahub', label: 'Cofre & Integração', icon: FolderOpen },
     { id: 'settings', label: 'Configurações', icon: Settings }

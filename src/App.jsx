@@ -16,6 +16,7 @@ const Investments = lazy(() => import('./components/Investments'));
 const Reports = lazy(() => import('./components/Reports'));
 const DataHub = lazy(() => import('./components/DataHub'));
 const SettingsManager = lazy(() => import('./components/layout/SettingsManager'));
+const SavingsGoals = lazy(() => import('./components/Goals'));
 
 function MainContent() {
   const { isLocked, isInitialized, setupMasterPassword, unlockWallet, lockWallet, settings } = useContext(FinanceContext);
@@ -70,6 +71,8 @@ function MainContent() {
         return <Reminders />;
       case 'investments':
         return <Investments />;
+      case 'goals':
+        return <SavingsGoals />;
       case 'reports':
         return <Reports />;
       case 'datahub':

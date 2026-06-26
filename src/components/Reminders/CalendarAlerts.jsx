@@ -15,16 +15,41 @@ const CalendarAlerts = () => {
     profile, 
     addReminder, 
     toggleReminderPaid, 
-    deleteReminder 
+    deleteReminder,
+    updateReminder
   } = useContext(FinanceContext);
 
   const [viewMode, setViewMode] = useState('calendar'); // 'calendar' or 'list'
+  const [sortBy, setSortBy] = useState('dueDate'); // 'dueDate', 'priority', 'amount'
   
   // Form states
   const [showForm, setShowForm] = useState(false);
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [priority, setPriority] = useState('important');
+
+  // Sorted reminders memo
+  const sortedReminders = useMemo(() => {
+    const priorityWeight = {
+      essential: 3,
+      important: 2,
+      optional: 1
+    };
+
+    return [...reminders].sort((a, b) => {
+      if (sortBy === 'priority') {
+        const weightA = priorityWeight[a.priority] || 2;
+        const weightB = priorityWeight[b.priority] || 2;
+        if (weightB !== weightA) return weightB - weightA;
+        return new Date(a.dueDate) - new Date(b.dueDate);
+      }
+      if (sortBy === 'amount') {
+        return b.amount - a.amount;
+      }
+      return new Date(a.dueDate) - new Date(b.dueDate);
+    });
+  }, [reminders, sortBy]);
 
   // Calendar active month/year (Defaults to June 2026 for consistency with mock data)
   const [currentYear, setCurrentYear] = useState(2026);
@@ -98,12 +123,14 @@ const CalendarAlerts = () => {
     addReminder({
       description,
       amount: parseFloat(amount),
-      dueDate
+      dueDate,
+      priority
     });
 
     setDescription('');
     setAmount('');
     setDueDate('');
+    setPriority('important');
     setShowForm(false);
   };
 
@@ -232,6 +259,19 @@ const CalendarAlerts = () => {
                 required 
               />
             </div>
+
+            <div className="form-group">
+              <label htmlFor="rem-priority">Prioridade</label>
+              <select 
+                id="rem-priority"
+                value={priority} 
+                onChange={(e) => setPriority(e.target.value)}
+              >
+                <option value="essential">🔴 Essencial</option>
+                <option value="important">🟡 Importante</option>
+                <option value="optional">🔵 Opcional</option>
+              </select>
+            </div>
           </div>
           <div className="form-actions">
             <button type="submit" className="btn btn-primary">Agendar Boleto</button>
@@ -305,6 +345,22 @@ const CalendarAlerts = () => {
             </button>
           </div>
         )}
+
+        {viewMode === 'list' && (
+          <div className="flex-center-y gap-sm">
+            <span className="text-secondary text-xs font-semibold">Ordenar por:</span>
+            <select 
+              value={sortBy} 
+              onChange={(e) => setSortBy(e.target.value)}
+              className="sort-select"
+              style={{ padding: '6px 12px', borderRadius: 'var(--border-radius-sm)', border: '1px solid var(--border-color)', background: 'var(--surface-color)', color: 'var(--text-primary)', fontSize: '12px' }}
+            >
+              <option value="dueDate">Vencimento</option>
+              <option value="priority">Prioridade</option>
+              <option value="amount">Valor</option>
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Calendar Grid View */}
@@ -361,6 +417,7 @@ const CalendarAlerts = () => {
               <thead>
                 <tr>
                   <th>Status</th>
+                  <th>Prioridade</th>
                   <th>Descrição</th>
                   <th>Vencimento</th>
                   <th>Valor</th>
@@ -368,8 +425,8 @@ const CalendarAlerts = () => {
                 </tr>
               </thead>
               <tbody>
-                {reminders.length > 0 ? (
-                  reminders.map(rem => {
+                {sortedReminders.length > 0 ? (
+                  sortedReminders.map(rem => {
                     const status = getReminderStatusInfo(rem);
                     return (
                       <tr key={rem.id} className={rem.paid ? 'row-paid' : 'row-pending'}>
@@ -378,6 +435,17 @@ const CalendarAlerts = () => {
                             {status.icon}
                             <span style={{ marginLeft: 6 }}>{status.label}</span>
                           </span>
+                        </td>
+                        <td>
+                          <select
+                            value={rem.priority || 'important'}
+                            onChange={(e) => updateReminder({ id: rem.id, priority: e.target.value })}
+                            className={`priority-select-inline ${rem.priority || 'important'}`}
+                          >
+                            <option value="essential">🔴 Essencial</option>
+                            <option value="important">🟡 Importante</option>
+                            <option value="optional">🔵 Opcional</option>
+                          </select>
                         </td>
                         <td className="font-semibold">{rem.description}</td>
                         <td>{rem.dueDate.split('-').reverse().join('/')}</td>
@@ -410,7 +478,7 @@ const CalendarAlerts = () => {
                   })
                 ) : (
                   <tr>
-                    <td colSpan="5" className="empty-table-cell">Nenhum boleto ou lembrete agendado.</td>
+                    <td colSpan="6" className="empty-table-cell">Nenhum boleto ou lembrete agendado.</td>
                   </tr>
                 )}
               </tbody>
@@ -430,10 +498,14 @@ const CalendarAlerts = () => {
             <div className="modal-body flex-column gap-md">
               {selectedDayReminders.map(rem => {
                 const status = getReminderStatusInfo(rem);
+                let priorityEmoji = '🟡';
+                if (rem.priority === 'essential') priorityEmoji = '🔴';
+                if (rem.priority === 'optional') priorityEmoji = '🔵';
+
                 return (
                   <div key={rem.id} className="flex-between flex-center-y p-sm border-radius-sm" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)' }}>
                     <div>
-                      <p className="font-semibold text-sm">{rem.description}</p>
+                      <p className="font-semibold text-sm">{priorityEmoji} {rem.description}</p>
                       <p className="amount-secondary text-xs mt-xs text-accent">{formatBRL(rem.amount)}</p>
                       <span className={`status-pill ${status.class} text-xxs font-semibold mt-sm inline-block`}>
                         {status.label}
