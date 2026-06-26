@@ -873,6 +873,7 @@ export const FinanceProvider = ({ children }) => {
       restoreFullBackup,
       // Sync parameters
       username,
+      jwtToken,
       syncStatus,
       syncWithCloud,
       registerCloud,

@@ -193,6 +193,114 @@ app.post('/api/auth/refresh', authenticate, (req, res) => {
   }
 });
 
+// 7. AI Advisor endpoint (interacts with Gemini API)
+app.post('/api/ai/advisor', authenticate, async (req, res) => {
+  const { question, context, history } = req.body;
+  
+  if (!question) {
+    return res.status(400).json({ error: 'A pergunta (question) é obrigatória.' });
+  }
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === 'insira_sua_chave_do_gemini_aqui') {
+    return res.status(500).json({ 
+      error: 'API Key do Gemini não configurada no servidor. Por favor, adicione GEMINI_API_KEY no arquivo .env do servidor.' 
+    });
+  }
+
+  try {
+    // Construct system instructions explaining the persona and Brazilian financial rules
+    const systemInstruction = 
+      "Você é um consultor financeiro de elite, economista sênior e planejador fiscal especialista na legislação tributária brasileira (Receita Federal, IRPF).\n" +
+      "Seu objetivo é ajudar o usuário a tomar as melhores decisões sobre investimentos e impostos com base nos dados fornecidos.\n\n" +
+      "Regras importantes a considerar:\n" +
+      "1. Declaração de IRPF: O limite para Desconto Simplificado é de R$ 16.754,34. Acima disso, a declaração Completa (por deduções legais) costuma valer mais a pena.\n" +
+      "2. Deduções Legais de IRPF: Despesas médicas são dedutíveis integralmente. Despesas com educação têm limite anual individual. Dependentes dão abatimento na base de cálculo.\n" +
+      "3. Previdência Privada: Contribuições para planos PGBL podem deduzir até 12% da renda bruta tributável do usuário na declaração completa. VGBL não deduz da base de cálculo, mas o imposto incide apenas sobre o rendimento no resgate.\n" +
+      "4. Isenção em Ações: Vendas de ações na bolsa (B3) por pessoas físicas são isentas de IRPF sobre ganho de capital até R$ 20.000,00 no mês. Acima disso, alíquota de 15% (deve ser paga via DARF no mês seguinte). Vendas de FIIs não têm isenção (alíquota de 20%).\n" +
+      "5. Renda Fixa: Títulos isentos incluem LCI, LCA, CRI, CRA e Debêntures Incentivadas. Tesouro Direto, CDBs e LC têm tabela regressiva de IR (22,5% a 15% dependendo do prazo).\n\n" +
+      "Responda sempre em português, com tom profissional, didático, acolhedor e focado em soluções práticas. Use formatação Markdown (negritos, tabelas, listas) para facilitar a leitura. Se faltarem dados para uma recomendação exata, explique o que falta.";
+
+    // Map history to Gemini content structure
+    // Gemini structure: contents: [ { role: 'user'|'model', parts: [ { text: '...' } ] } ]
+    const contents = [];
+    
+    // 1. Add context as the first turn
+    const contextText = `Aqui está o meu contexto financeiro atual em formato JSON:\n\`\`\`json\n${JSON.stringify(context, null, 2)}\n\`\`\``;
+    contents.push({
+      role: 'user',
+      parts: [{ text: contextText }]
+    });
+    
+    contents.push({
+      role: 'model',
+      parts: [{ text: "Entendido. Analisei seu contexto financeiro. Estou pronto para ajudar com seus investimentos, planejamento fiscal e contabilidade. Qual a sua dúvida?" }]
+    });
+
+    // 2. Add history if provided
+    if (Array.isArray(history)) {
+      history.forEach(msg => {
+        contents.push({
+          role: msg.sender === 'user' ? 'user' : 'model',
+          parts: [{ text: msg.text }]
+        });
+      });
+    }
+
+    // 3. Add current user question
+    contents.push({
+      role: 'user',
+      parts: [{ text: question }]
+    });
+
+    // Call Gemini API using native fetch
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents,
+          systemInstruction: {
+            parts: [{ text: systemInstruction }]
+          },
+          tools: [
+            {
+              googleSearch: {}
+            }
+          ],
+          generationConfig: {
+            temperature: 1,
+            maxOutputTokens: 65536,
+            topP: 0.95,
+            thinkingConfig: {
+              thinkingBudget: 2048
+            }
+          }
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('Gemini API Error:', errorData);
+      return res.status(502).json({ 
+        error: 'Erro de comunicação com o serviço de Inteligência Artificial.', 
+        details: errorData.error?.message || 'Erro desconhecido' 
+      });
+    }
+
+    const data = await response.json();
+    const replyText = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Desculpe, não consegui formular uma resposta.';
+    
+    res.json({ reply: replyText });
+  } catch (err) {
+    console.error('AI Route Error:', err);
+    res.status(500).json({ error: 'Erro interno no processador do consultor IA.' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Zero-Knowledge sync server running on port ${PORT}`);
 });
+

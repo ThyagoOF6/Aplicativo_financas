@@ -17,6 +17,7 @@ const Reports = lazy(() => import('./components/Reports'));
 const DataHub = lazy(() => import('./components/DataHub'));
 const SettingsManager = lazy(() => import('./components/layout/SettingsManager'));
 const SavingsGoals = lazy(() => import('./components/Goals'));
+const AIAdvisor = lazy(() => import('./components/AIAdvisor/AIAdvisor'));
 
 function MainContent() {
   const { isLocked, isInitialized, setupMasterPassword, unlockWallet, lockWallet, settings, syncWithCloud } = useContext(FinanceContext);
@@ -75,6 +76,8 @@ function MainContent() {
         return <Investments />;
       case 'goals':
         return <SavingsGoals />;
+      case 'ai-advisor':
+        return <AIAdvisor />;
       case 'reports':
         return <Reports />;
       case 'datahub':
@@ -85,6 +88,7 @@ function MainContent() {
         return <Dashboard setActiveTab={setActiveTab} />;
     }
   };
+
 
   if (isLocked) {
     return (
